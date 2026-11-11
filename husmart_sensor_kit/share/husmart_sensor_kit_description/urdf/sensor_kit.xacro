@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+  <!-- Sabit bağlantılı bir çerçeve -->
+  <xacro:macro name="husmart_frame" params="name parent x y z roll pitch yaw">
+    <joint name="${name}_joint" type="fixed">
+      <origin xyz="${x} ${y} ${z}" rpy="${roll} ${pitch} ${yaw}"/>
+      <parent link="${parent}"/>
+      <child link="${name}"/>
+    </joint>
+    <link name="${name}"/>
+  </xacro:macro>
+</robot>

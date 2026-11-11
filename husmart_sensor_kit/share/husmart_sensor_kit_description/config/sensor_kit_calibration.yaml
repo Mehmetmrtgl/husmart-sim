@@ -1,0 +1,2 @@
+# Hüsmart v2: tüm sensörler sensors_calibration.yaml içinde base_link'e göre tanımlı.
+sensor_kit_base_link: {}

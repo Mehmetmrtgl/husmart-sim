@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<robot name="vehicle" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:arg name="config_dir" default="$(find husmart_sensor_kit_description)/config"/>
+  <xacro:property name="b" value="${xacro.load_yaml('$(arg config_dir)/sensors_calibration.yaml')['base_link']}"/>
+  <xacro:include filename="sensor_kit.xacro"/>
+  <xacro:husmart_frame name="sensor_kit_base_link" parent="base_link" x="${b['sensor_kit_base_link']['x']}" y="${b['sensor_kit_base_link']['y']}" z="${b['sensor_kit_base_link']['z']}" roll="${b['sensor_kit_base_link']['roll']}" pitch="${b['sensor_kit_base_link']['pitch']}" yaw="${b['sensor_kit_base_link']['yaw']}"/>
+  <xacro:husmart_frame name="ot128_top" parent="base_link" x="${b['ot128_top']['x']}" y="${b['ot128_top']['y']}" z="${b['ot128_top']['z']}" roll="${b['ot128_top']['roll']}" pitch="${b['ot128_top']['pitch']}" yaw="${b['ot128_top']['yaw']}"/>
+  <xacro:husmart_frame name="jt128_front" parent="base_link" x="${b['jt128_front']['x']}" y="${b['jt128_front']['y']}" z="${b['jt128_front']['z']}" roll="${b['jt128_front']['roll']}" pitch="${b['jt128_front']['pitch']}" yaw="${b['jt128_front']['yaw']}"/>
+  <xacro:husmart_frame name="jt128_front_left" parent="base_link" x="${b['jt128_front_left']['x']}" y="${b['jt128_front_left']['y']}" z="${b['jt128_front_left']['z']}" roll="${b['jt128_front_left']['roll']}" pitch="${b['jt128_front_left']['pitch']}" yaw="${b['jt128_front_left']['yaw']}"/>
+  <xacro:husmart_frame name="jt128_front_right" parent="base_link" x="${b['jt128_front_right']['x']}" y="${b['jt128_front_right']['y']}" z="${b['jt128_front_right']['z']}" roll="${b['jt128_front_right']['roll']}" pitch="${b['jt128_front_right']['pitch']}" yaw="${b['jt128_front_right']['yaw']}"/>
+  <xacro:husmart_frame name="jt128_left" parent="base_link" x="${b['jt128_left']['x']}" y="${b['jt128_left']['y']}" z="${b['jt128_left']['z']}" roll="${b['jt128_left']['roll']}" pitch="${b['jt128_left']['pitch']}" yaw="${b['jt128_left']['yaw']}"/>
+  <xacro:husmart_frame name="jt128_right" parent="base_link" x="${b['jt128_right']['x']}" y="${b['jt128_right']['y']}" z="${b['jt128_right']['z']}" roll="${b['jt128_right']['roll']}" pitch="${b['jt128_right']['pitch']}" yaw="${b['jt128_right']['yaw']}"/>
+  <xacro:husmart_frame name="jt128_rear_left" parent="base_link" x="${b['jt128_rear_left']['x']}" y="${b['jt128_rear_left']['y']}" z="${b['jt128_rear_left']['z']}" roll="${b['jt128_rear_left']['roll']}" pitch="${b['jt128_rear_left']['pitch']}" yaw="${b['jt128_rear_left']['yaw']}"/>
+  <xacro:husmart_frame name="jt128_rear_right" parent="base_link" x="${b['jt128_rear_right']['x']}" y="${b['jt128_rear_right']['y']}" z="${b['jt128_rear_right']['z']}" roll="${b['jt128_rear_right']['roll']}" pitch="${b['jt128_rear_right']['pitch']}" yaw="${b['jt128_rear_right']['yaw']}"/>
+  <xacro:husmart_frame name="jt128_rear" parent="base_link" x="${b['jt128_rear']['x']}" y="${b['jt128_rear']['y']}" z="${b['jt128_rear']['z']}" roll="${b['jt128_rear']['roll']}" pitch="${b['jt128_rear']['pitch']}" yaw="${b['jt128_rear']['yaw']}"/>
+  <xacro:husmart_frame name="zedx_front_camera_center" parent="base_link" x="${b['zedx_front_camera_center']['x']}" y="${b['zedx_front_camera_center']['y']}" z="${b['zedx_front_camera_center']['z']}" roll="${b['zedx_front_camera_center']['roll']}" pitch="${b['zedx_front_camera_center']['pitch']}" yaw="${b['zedx_front_camera_center']['yaw']}"/>
+  <xacro:husmart_frame name="zedx_rear_camera_center" parent="base_link" x="${b['zedx_rear_camera_center']['x']}" y="${b['zedx_rear_camera_center']['y']}" z="${b['zedx_rear_camera_center']['z']}" roll="${b['zedx_rear_camera_center']['roll']}" pitch="${b['zedx_rear_camera_center']['pitch']}" yaw="${b['zedx_rear_camera_center']['yaw']}"/>
+  <xacro:husmart_frame name="gnss_link" parent="base_link" x="${b['gnss_link']['x']}" y="${b['gnss_link']['y']}" z="${b['gnss_link']['z']}" roll="${b['gnss_link']['roll']}" pitch="${b['gnss_link']['pitch']}" yaw="${b['gnss_link']['yaw']}"/>
+  <xacro:husmart_frame name="mti7_imu_link" parent="base_link" x="${b['mti7_imu_link']['x']}" y="${b['mti7_imu_link']['y']}" z="${b['mti7_imu_link']['z']}" roll="${b['mti7_imu_link']['roll']}" pitch="${b['mti7_imu_link']['pitch']}" yaw="${b['mti7_imu_link']['yaw']}"/>
+  <xacro:husmart_frame name="zedx_front_left_camera_frame" parent="zedx_front_camera_center" x="0" y="0.06" z="0" roll="0" pitch="0" yaw="0"/>
+  <xacro:husmart_frame name="zedx_front_left_camera_optical_frame" parent="zedx_front_left_camera_frame" x="0" y="0" z="0" roll="${-pi/2}" pitch="0" yaw="${-pi/2}"/>
+  <xacro:husmart_frame name="zedx_front_right_camera_frame" parent="zedx_front_camera_center" x="0" y="-0.06" z="0" roll="0" pitch="0" yaw="0"/>
+  <xacro:husmart_frame name="zedx_front_right_camera_optical_frame" parent="zedx_front_right_camera_frame" x="0" y="0" z="0" roll="${-pi/2}" pitch="0" yaw="${-pi/2}"/>
+  <xacro:husmart_frame name="zedx_rear_left_camera_frame" parent="zedx_rear_camera_center" x="0" y="0.06" z="0" roll="0" pitch="0" yaw="0"/>
+  <xacro:husmart_frame name="zedx_rear_left_camera_optical_frame" parent="zedx_rear_left_camera_frame" x="0" y="0" z="0" roll="${-pi/2}" pitch="0" yaw="${-pi/2}"/>
+  <xacro:husmart_frame name="zedx_rear_right_camera_frame" parent="zedx_rear_camera_center" x="0" y="-0.06" z="0" roll="0" pitch="0" yaw="0"/>
+  <xacro:husmart_frame name="zedx_rear_right_camera_optical_frame" parent="zedx_rear_right_camera_frame" x="0" y="0" z="0" roll="${-pi/2}" pitch="0" yaw="${-pi/2}"/>
+</robot>

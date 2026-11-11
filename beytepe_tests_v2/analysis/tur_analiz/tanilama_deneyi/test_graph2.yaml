@@ -1,0 +1,10 @@
+units:
+  - path: /t/plain
+    type: and
+    list:
+      - { type: diag, node: test_node, name: plain }
+  - path: /t/combo
+    type: and
+    list:
+      - { type: diag, node: test_node, name: hyst_leaf, hysteresis: 0.5 }
+      - { type: warn-to-ok, item: { type: diag, node: test_node, name: hyst_leaf } }

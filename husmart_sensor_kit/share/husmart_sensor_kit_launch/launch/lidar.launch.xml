@@ -1,0 +1,196 @@
+<launch>
+  <arg name="host_ip" default="192.168.1.10"/>
+  <arg name="vehicle_mirror_param_file"/>
+  <arg name="pointcloud_container_name" default="pointcloud_container"/>
+  <arg name="use_distortion_corrector" default="true"/>
+  <!-- Hüsmart v3 (2026-11-11): çatıda 1 x Hesai OT128, tampon hizasında 8 x Hesai JT128 (laboratuvarın
+       HUSMART-AV/Autoware_1.9.0_launch kitiyle aynı adlar, yerleşim, IP ve portlar).
+       AWSIM her lidarı /sensing/lidar/AD/pointcloud_raw_ex konusuna yayınlar; sürücü çalışmaz (launch_driver false).
+       Her lidar için Autoware ortak ön işleme hattı: gövde/ayna kırpma, bozulma düzeltme, halka aykırı süzgeci;
+       sonra concatenate_and_time_sync hepsini /sensing/lidar/concatenated/pointcloud olarak birleştirir.
+       sensor_ip / data_port gerçek araç içindir (laboratuvar tablosu); benzetimde kullanılmaz.
+       Halka süzgeci: config/ring_outlier_filter_node.param.yaml (max_rings_num 129; AWSIM OT128 halkaları 1..128).
+       Bir lidarı kapatmak için: ros2 launch ... enable_jt128_rear:=false (laboratuvar kitindeki bayraklar). -->
+  <arg name="enable_ot128_top" default="true"/>
+  <arg name="enable_jt128_front" default="true"/>
+  <arg name="enable_jt128_front_left" default="true"/>
+  <arg name="enable_jt128_front_right" default="true"/>
+  <arg name="enable_jt128_left" default="true"/>
+  <arg name="enable_jt128_right" default="true"/>
+  <arg name="enable_jt128_rear_left" default="true"/>
+  <arg name="enable_jt128_rear_right" default="true"/>
+  <arg name="enable_jt128_rear" default="true"/>
+  <group>
+    <push-ros-namespace namespace="lidar"/>
+    <!-- OT128 (çatı, uzun menzil): 192.168.1.201:2368 -->
+    <group>
+      <push-ros-namespace namespace="ot128_top"/>
+      <include file="$(find-pkg-share common_sensor_launch)/launch/velodyne_VLP16.launch.xml" if="$(var enable_ot128_top)">
+        <arg name="max_range" value="230.0"/>
+        <arg name="min_range" value="0.3"/>
+        <arg name="sensor_frame" value="ot128_top"/>
+        <arg name="sensor_ip" value="192.168.1.201"/>
+        <arg name="host_ip" value="$(var host_ip)"/>
+        <arg name="data_port" value="2368"/>
+        <arg name="scan_phase" value="0.0"/>
+        <arg name="launch_driver" value="false"/>
+        <arg name="vehicle_mirror_param_file" value="$(find-pkg-share husmart_sensor_kit_launch)/config/self_body_crop.param.yaml"/>
+        <arg name="ring_outlier_filter_node_param_path" value="$(find-pkg-share husmart_sensor_kit_launch)/config/ring_outlier_filter_node.param.yaml"/>
+        <arg name="container_name" value="pointcloud_container"/>
+        <arg name="udp_only" value="true"/>
+      </include>
+    </group>
+    <!-- JT128 ön: 192.168.1.202:2369 -->
+    <group>
+      <push-ros-namespace namespace="jt128_front"/>
+      <include file="$(find-pkg-share common_sensor_launch)/launch/velodyne_VLP16.launch.xml" if="$(var enable_jt128_front)">
+        <arg name="max_range" value="60.0"/>
+        <arg name="min_range" value="0.05"/>
+        <arg name="sensor_frame" value="jt128_front"/>
+        <arg name="sensor_ip" value="192.168.1.202"/>
+        <arg name="host_ip" value="$(var host_ip)"/>
+        <arg name="data_port" value="2369"/>
+        <arg name="scan_phase" value="0.0"/>
+        <arg name="launch_driver" value="false"/>
+        <arg name="vehicle_mirror_param_file" value="$(find-pkg-share husmart_sensor_kit_launch)/config/self_body_crop.param.yaml"/>
+        <arg name="ring_outlier_filter_node_param_path" value="$(find-pkg-share husmart_sensor_kit_launch)/config/ring_outlier_filter_node.param.yaml"/>
+        <arg name="container_name" value="pointcloud_container"/>
+        <arg name="udp_only" value="true"/>
+      </include>
+    </group>
+    <!-- JT128 ön sol: 192.168.1.203:2370 -->
+    <group>
+      <push-ros-namespace namespace="jt128_front_left"/>
+      <include file="$(find-pkg-share common_sensor_launch)/launch/velodyne_VLP16.launch.xml" if="$(var enable_jt128_front_left)">
+        <arg name="max_range" value="60.0"/>
+        <arg name="min_range" value="0.05"/>
+        <arg name="sensor_frame" value="jt128_front_left"/>
+        <arg name="sensor_ip" value="192.168.1.203"/>
+        <arg name="host_ip" value="$(var host_ip)"/>
+        <arg name="data_port" value="2370"/>
+        <arg name="scan_phase" value="0.0"/>
+        <arg name="launch_driver" value="false"/>
+        <arg name="vehicle_mirror_param_file" value="$(find-pkg-share husmart_sensor_kit_launch)/config/self_body_crop.param.yaml"/>
+        <arg name="ring_outlier_filter_node_param_path" value="$(find-pkg-share husmart_sensor_kit_launch)/config/ring_outlier_filter_node.param.yaml"/>
+        <arg name="container_name" value="pointcloud_container"/>
+        <arg name="udp_only" value="true"/>
+      </include>
+    </group>
+    <!-- JT128 ön sağ: 192.168.1.204:2371 -->
+    <group>
+      <push-ros-namespace namespace="jt128_front_right"/>
+      <include file="$(find-pkg-share common_sensor_launch)/launch/velodyne_VLP16.launch.xml" if="$(var enable_jt128_front_right)">
+        <arg name="max_range" value="60.0"/>
+        <arg name="min_range" value="0.05"/>
+        <arg name="sensor_frame" value="jt128_front_right"/>
+        <arg name="sensor_ip" value="192.168.1.204"/>
+        <arg name="host_ip" value="$(var host_ip)"/>
+        <arg name="data_port" value="2371"/>
+        <arg name="scan_phase" value="0.0"/>
+        <arg name="launch_driver" value="false"/>
+        <arg name="vehicle_mirror_param_file" value="$(find-pkg-share husmart_sensor_kit_launch)/config/self_body_crop.param.yaml"/>
+        <arg name="ring_outlier_filter_node_param_path" value="$(find-pkg-share husmart_sensor_kit_launch)/config/ring_outlier_filter_node.param.yaml"/>
+        <arg name="container_name" value="pointcloud_container"/>
+        <arg name="udp_only" value="true"/>
+      </include>
+    </group>
+    <!-- JT128 sol: 192.168.1.205:2372 -->
+    <group>
+      <push-ros-namespace namespace="jt128_left"/>
+      <include file="$(find-pkg-share common_sensor_launch)/launch/velodyne_VLP16.launch.xml" if="$(var enable_jt128_left)">
+        <arg name="max_range" value="60.0"/>
+        <arg name="min_range" value="0.05"/>
+        <arg name="sensor_frame" value="jt128_left"/>
+        <arg name="sensor_ip" value="192.168.1.205"/>
+        <arg name="host_ip" value="$(var host_ip)"/>
+        <arg name="data_port" value="2372"/>
+        <arg name="scan_phase" value="0.0"/>
+        <arg name="launch_driver" value="false"/>
+        <arg name="vehicle_mirror_param_file" value="$(find-pkg-share husmart_sensor_kit_launch)/config/self_body_crop.param.yaml"/>
+        <arg name="ring_outlier_filter_node_param_path" value="$(find-pkg-share husmart_sensor_kit_launch)/config/ring_outlier_filter_node.param.yaml"/>
+        <arg name="container_name" value="pointcloud_container"/>
+        <arg name="udp_only" value="true"/>
+      </include>
+    </group>
+    <!-- JT128 sağ: 192.168.1.206:2373 -->
+    <group>
+      <push-ros-namespace namespace="jt128_right"/>
+      <include file="$(find-pkg-share common_sensor_launch)/launch/velodyne_VLP16.launch.xml" if="$(var enable_jt128_right)">
+        <arg name="max_range" value="60.0"/>
+        <arg name="min_range" value="0.05"/>
+        <arg name="sensor_frame" value="jt128_right"/>
+        <arg name="sensor_ip" value="192.168.1.206"/>
+        <arg name="host_ip" value="$(var host_ip)"/>
+        <arg name="data_port" value="2373"/>
+        <arg name="scan_phase" value="0.0"/>
+        <arg name="launch_driver" value="false"/>
+        <arg name="vehicle_mirror_param_file" value="$(find-pkg-share husmart_sensor_kit_launch)/config/self_body_crop.param.yaml"/>
+        <arg name="ring_outlier_filter_node_param_path" value="$(find-pkg-share husmart_sensor_kit_launch)/config/ring_outlier_filter_node.param.yaml"/>
+        <arg name="container_name" value="pointcloud_container"/>
+        <arg name="udp_only" value="true"/>
+      </include>
+    </group>
+    <!-- JT128 arka sol: 192.168.1.207:2374 -->
+    <group>
+      <push-ros-namespace namespace="jt128_rear_left"/>
+      <include file="$(find-pkg-share common_sensor_launch)/launch/velodyne_VLP16.launch.xml" if="$(var enable_jt128_rear_left)">
+        <arg name="max_range" value="60.0"/>
+        <arg name="min_range" value="0.05"/>
+        <arg name="sensor_frame" value="jt128_rear_left"/>
+        <arg name="sensor_ip" value="192.168.1.207"/>
+        <arg name="host_ip" value="$(var host_ip)"/>
+        <arg name="data_port" value="2374"/>
+        <arg name="scan_phase" value="0.0"/>
+        <arg name="launch_driver" value="false"/>
+        <arg name="vehicle_mirror_param_file" value="$(find-pkg-share husmart_sensor_kit_launch)/config/self_body_crop.param.yaml"/>
+        <arg name="ring_outlier_filter_node_param_path" value="$(find-pkg-share husmart_sensor_kit_launch)/config/ring_outlier_filter_node.param.yaml"/>
+        <arg name="container_name" value="pointcloud_container"/>
+        <arg name="udp_only" value="true"/>
+      </include>
+    </group>
+    <!-- JT128 arka sağ: 192.168.1.208:2375 -->
+    <group>
+      <push-ros-namespace namespace="jt128_rear_right"/>
+      <include file="$(find-pkg-share common_sensor_launch)/launch/velodyne_VLP16.launch.xml" if="$(var enable_jt128_rear_right)">
+        <arg name="max_range" value="60.0"/>
+        <arg name="min_range" value="0.05"/>
+        <arg name="sensor_frame" value="jt128_rear_right"/>
+        <arg name="sensor_ip" value="192.168.1.208"/>
+        <arg name="host_ip" value="$(var host_ip)"/>
+        <arg name="data_port" value="2375"/>
+        <arg name="scan_phase" value="0.0"/>
+        <arg name="launch_driver" value="false"/>
+        <arg name="vehicle_mirror_param_file" value="$(find-pkg-share husmart_sensor_kit_launch)/config/self_body_crop.param.yaml"/>
+        <arg name="ring_outlier_filter_node_param_path" value="$(find-pkg-share husmart_sensor_kit_launch)/config/ring_outlier_filter_node.param.yaml"/>
+        <arg name="container_name" value="pointcloud_container"/>
+        <arg name="udp_only" value="true"/>
+      </include>
+    </group>
+    <!-- JT128 arka: 192.168.1.209:2376 -->
+    <group>
+      <push-ros-namespace namespace="jt128_rear"/>
+      <include file="$(find-pkg-share common_sensor_launch)/launch/velodyne_VLP16.launch.xml" if="$(var enable_jt128_rear)">
+        <arg name="max_range" value="60.0"/>
+        <arg name="min_range" value="0.05"/>
+        <arg name="sensor_frame" value="jt128_rear"/>
+        <arg name="sensor_ip" value="192.168.1.209"/>
+        <arg name="host_ip" value="$(var host_ip)"/>
+        <arg name="data_port" value="2376"/>
+        <arg name="scan_phase" value="0.0"/>
+        <arg name="launch_driver" value="false"/>
+        <arg name="vehicle_mirror_param_file" value="$(find-pkg-share husmart_sensor_kit_launch)/config/self_body_crop.param.yaml"/>
+        <arg name="ring_outlier_filter_node_param_path" value="$(find-pkg-share husmart_sensor_kit_launch)/config/ring_outlier_filter_node.param.yaml"/>
+        <arg name="container_name" value="pointcloud_container"/>
+        <arg name="udp_only" value="true"/>
+      </include>
+    </group>
+    <load_composable_node target="$(var pointcloud_container_name)">
+      <composable_node pkg="autoware_pointcloud_preprocessor" plugin="autoware::pointcloud_preprocessor::PointCloudConcatenateDataSynchronizerComponent" name="concatenate_data">
+        <remap from="~/input/twist" to="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
+        <remap from="output" to="/sensing/lidar/concatenated/pointcloud"/>
+        <remap from="output_info" to="/sensing/lidar/concatenated/pointcloud_info"/>
+        <param from="$(find-pkg-share husmart_sensor_kit_launch)/config/concatenate_and_time_sync_node.param.yaml"/>
+      </composable_node>
+    </load_composable_node>
+  </group>
+</launch>

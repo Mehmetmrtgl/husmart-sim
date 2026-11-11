@@ -1,0 +1,4 @@
+[
+ {"name": "e2e_01_shinjuku_300m", "title": "AWSIM uçtan uca: mevcut konumdan 300 m ileri (Shinjuku, rastgele trafik)",
+  "start": {"current": true}, "goal": {"ahead": 300}, "timeout": 400, "stuck_s": 90, "lat_dev_limit": 0.5}
+]

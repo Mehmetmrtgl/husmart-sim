@@ -1,0 +1,103 @@
+# Hüsmart sensör kalibrasyonu (base_link'e göre; m, rad). Konumlar TAHMİNİ (araç ölçülmedi).
+# 2026-11-11: lidar yerleşimi laboratuvarın HUSMART-AV/Autoware_1.9.0_launch kitiyle aynı yapıldı:
+#   çatıda 1 x Hesai OT128 (ot128_top), tampon hizasında (z 0.5 m) dik takılı ve dışa bakan 8 x Hesai JT128.
+# AWSIM tarafı ~/awsim/beytepe-config-husmart.json 'SensorRig' ile AYNI olmalı.
+base_link:
+  sensor_kit_base_link:
+    x: 0.9
+    y: 0.0
+    z: 2.0
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
+  ot128_top:
+    x: 0.9
+    y: 0.0
+    z: 2.0
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
+  jt128_front:
+    x: 4.0
+    y: 0.0
+    z: 0.5
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
+  jt128_front_left:
+    x: 3.5
+    y: 1.0
+    z: 0.5
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.7853982
+  jt128_front_right:
+    x: 3.5
+    y: -1.0
+    z: 0.5
+    roll: 0.0
+    pitch: 0.0
+    yaw: -0.7853982
+  jt128_left:
+    x: 1.0
+    y: 1.05
+    z: 0.5
+    roll: 0.0
+    pitch: 0.0
+    yaw: 1.5707963
+  jt128_right:
+    x: 1.0
+    y: -1.05
+    z: 0.5
+    roll: 0.0
+    pitch: 0.0
+    yaw: -1.5707963
+  jt128_rear_left:
+    x: -0.8
+    y: 1.0
+    z: 0.5
+    roll: 0.0
+    pitch: 0.0
+    yaw: 2.3561945
+  jt128_rear_right:
+    x: -0.8
+    y: -1.0
+    z: 0.5
+    roll: 0.0
+    pitch: 0.0
+    yaw: -2.3561945
+  jt128_rear:
+    x: -1.1
+    y: 0.0
+    z: 0.5
+    roll: 0.0
+    pitch: 0.0
+    yaw: 3.1415927
+  zedx_front_camera_center:
+    x: 1.65
+    y: 0.0
+    z: 1.8
+    roll: 0.0
+    pitch: 0.0872665
+    yaw: 0.0
+  zedx_rear_camera_center:
+    x: -0.15
+    y: 0.0
+    z: 1.76
+    roll: 0.0
+    pitch: 0.0872665
+    yaw: 3.1415927
+  gnss_link:
+    x: 0.4
+    y: 0.0
+    z: 1.82
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0
+  mti7_imu_link:
+    x: 1.2
+    y: 0.0
+    z: 0.45
+    roll: 0.0
+    pitch: 0.0
+    yaw: 0.0

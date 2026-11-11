@@ -1,0 +1,85 @@
+{
+    "TimeScale": 1.0,
+    "TimeSourceType": 3,
+    "RandomTrafficSeed": 0,
+    "MaxVehicleCount": 60,
+    "LogitechG29Settings": {
+        "_devicePath": "/dev/input/event3",
+        "_selfAligningTorqueCoeff": 1.0
+    },
+    "EgoVehicleSettings": {
+        "_maxSteerTireAngleInput": 35,
+        "_maxAccelerationInput": 2,
+        "_maxDecelerationInput": 2
+    },
+    "EgoPose": {
+        "Position": {
+            "x": 185.98,
+            "y": -193.18,
+            "z": 138.14
+        },
+        "EulerAngles": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 83.8
+        }
+    },
+    "SensorRig": {
+        "Name": "husmart",
+        "HideLexusSensorKit": true,
+        "Lidar": {
+            "Position": {
+                "x": 0.9,
+                "y": 0.0,
+                "z": 1.84
+            },
+            "RollPitchYawDeg": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "MaxRange": 60.0,
+            "Hz": 10
+        },
+        "Stereo": {
+            "Enabled": true,
+            "Width": 1920,
+            "Height": 1200,
+            "Hz": 15.0,
+            "BaselineM": 0.12,
+            "FocalLengthMm": 2.2,
+            "PixelSizeUm": 3.0,
+            "Position": {
+                "x": 1.65,
+                "y": 0.0,
+                "z": 1.8
+            },
+            "RollPitchYawDeg": {
+                "x": 0.0,
+                "y": 5.0,
+                "z": 0.0
+            }
+        },
+        "Ins": {
+            "Enabled": true,
+            "ImuHz": 100,
+            "GnssHz": 4.0,
+            "Position": {
+                "x": 1.2,
+                "y": 0.0,
+                "z": 0.45
+            },
+            "RollPitchYawDeg": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "AntennaPosition": {
+                "x": 0.4,
+                "y": 0.0,
+                "z": 1.82
+            },
+            "Noise": true
+        }
+    }
+}

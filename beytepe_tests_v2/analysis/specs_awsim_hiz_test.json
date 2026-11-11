@@ -1,0 +1,4 @@
+[
+ {"name": "awsim_beytepe_hiz_test", "title": "50 km/sa ölçüm sürüşü (700 m ileri)",
+  "start": {"current": true}, "goal": {"ahead": 700}, "timeout": 120, "stuck_s": 60, "lat_dev_limit": 0.5}
+]

@@ -1,0 +1,49 @@
+units:
+  - path: /autoware/localization
+    type: and
+    list:
+      - type: link
+        link: /autoware/localization/state
+      - type: and
+        list:
+          - { type: link, link: /autoware/localization/topic_rate_check/transform }
+          - { type: link, link: /autoware/localization/topic_rate_check/pose_twist_fusion }
+          - { type: link, link: /autoware/localization/scan_matching_status }
+          - { type: link, link: /autoware/localization/accuracy }
+          - { type: link, link: /autoware/localization/sensor_fusion_status }
+
+  - path: /autoware/localization/state
+    type: diag
+    node: /adapi/node/localization
+    name: state
+    timeout: 3.0  # Beytepe/AWSIM: 1 Hz ADAPI teşhisi + 0.1 s'lik sim saati adımları 1.0 s varsayılanını aşıyordu (MRM)
+
+  - path: /autoware/localization/topic_rate_check/transform
+    type: diag
+    node: topic_state_monitor_transform_map_to_base_link
+    name: localization_topic_status
+
+  - path: /autoware/localization/topic_rate_check/pose_twist_fusion
+    type: diag
+    node: topic_state_monitor_pose_twist_fusion_filter_pose
+    name: localization_topic_status
+
+  - path: /autoware/localization/scan_matching_status
+    type: diag
+    node: ndt_scan_matcher
+    name: scan_matching_status
+    # Beytepe/Hüsmart (2026-11-08): NDT'nin tek döngülük (0.1 s) "oscillation in a local minimum" uyarısı, konum doğruyken
+    # (hata ~0.1 m, NVTL > 3) MRM (acil durma) tetikliyordu. hysteresis: seviye değişimi ancak 0.5 s'den uzun sürerse
+    # iletilir; 0.5 s'den uzun süren her NDT uyarısı/hatası yine MRM tetikler. EKF ve localization_error_monitor değişmedi.
+    # Yalıtılmış denemede (ROS_DOMAIN_ID 98): 0.1/0.3 s'lik WARN yutuldu, 2 s'lik WARN ~0.6 s gecikmeyle iletildi.
+    hysteresis: 0.5
+
+  - path: /autoware/localization/accuracy
+    type: diag
+    node: localization_error_monitor
+    name: ellipse_error_status
+
+  - path: /autoware/localization/sensor_fusion_status
+    type: diag
+    node: localization
+    name: ekf_localizer

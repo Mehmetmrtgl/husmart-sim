@@ -1,0 +1,10 @@
+# Hüsmart: NDT girdisi yalnız çatı QT128 (50 m menzil) olduğu için voxel 3.0 -> 2.0 m.
+# Tur 06 (1.5 m): doğruluk biraz arttı ama 5 iterasyon sınırı uyarısı + 3 kısa MRM; 2.0 ara değer olarak deneniyor.
+# 3.0 m'de yalnız ~570 nokta kalıyordu (9 lidar birleşikken rastgele seyreltme sınırı olan 1500'e ulaşılıyordu);
+# 1.5 m'de nokta sayısı yeniden ~1500 sınırına çıkar. Özgünü: autoware_launch/config/localization/ndt_scan_matcher/
+# pointcloud_preprocessor/voxel_grid_filter.param.yaml (voxel_size_x/y/z: 3.0)
+/**:
+  ros__parameters:
+    voxel_size_x: 2.0
+    voxel_size_y: 2.0
+    voxel_size_z: 2.0

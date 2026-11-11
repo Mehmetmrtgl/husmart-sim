@@ -1,0 +1,4 @@
+[
+ {"name": "awsim_beytepe_03_uzun_50kmh", "title": "AWSIM Beytepe: başlangıç noktasından ~5.9 km rota (lanelet 2000162), hız sınırı 50 km/sa",
+  "start": {"current": true}, "goal": {"lanelet": 2000162, "frac": 0.5}, "timeout": 1500, "stuck_s": 120, "lat_dev_limit": 0.5}
+]

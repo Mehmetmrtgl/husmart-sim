@@ -1,0 +1,32 @@
+<launch>
+  <!-- Hüsmart sensör kiti (AWSIM). AWSIM sensör verisini doğrudan ROS konularına yayınladığı için sürücü yok;
+       gerçek araçta: HesaiLidar_ROS_2.0 (JT128), zed_wrapper (ZED X), xsens_mti_ros2_driver (MTi-7). -->
+  <arg name="launch_driver" default="false" description="AWSIM'de kullanılmaz"/>
+  <arg name="vehicle_mirror_param_file" description="path to the file of vehicle mirror position yaml"/>
+  <arg name="pointcloud_container_name" default="pointcloud_container"/>
+  <arg name="use_distortion_corrector" default="true" description="araç hareketinden doğan nokta bulutu bozulmasını düzelt"/>
+
+  <group>
+    <!-- LiDAR: çatıda Hesai OT128 (/sensing/lidar/ot128_top/...), çevrede 8 x JT128 (/sensing/lidar/jt128_*/...) -->
+    <include file="$(find-pkg-share husmart_sensor_kit_launch)/launch/lidar.launch.xml">
+      <arg name="vehicle_mirror_param_file" value="$(var vehicle_mirror_param_file)"/>
+      <arg name="pointcloud_container_name" value="$(var pointcloud_container_name)"/>
+      <arg name="use_distortion_corrector" value="$(var use_distortion_corrector)"/>
+    </include>
+
+    <!-- Kamera: AWSIM ZED X görüntülerini /sensing/camera/zedx/{left,right}/image_rect_color + camera_info olarak yayınlar. -->
+
+    <!-- IMU: Xsens MTi-7 (/sensing/imu/mti7/imu_raw) -->
+    <include file="$(find-pkg-share husmart_sensor_kit_launch)/launch/imu.launch.xml"/>
+
+    <!-- GNSS: AWSIM /sensing/gnss/pose_with_covariance'ı (MTi-7 anteninin harita çerçevesindeki konumu) doğrudan yayınlar.
+         Harita "Local" projektörlü olduğu için gnss_poser (NavSatFix -> harita) burada kullanılmaz;
+         MTi-7'nin NavSatFix'i /sensing/gnss/mti7/nav_sat_fix kayıt/değerlendirme içindir. -->
+
+    <!-- Araç hızı -->
+    <include file="$(find-pkg-share autoware_vehicle_velocity_converter)/launch/vehicle_velocity_converter.launch.xml">
+      <arg name="input_vehicle_velocity_topic" value="/vehicle/status/velocity_status"/>
+      <arg name="output_twist_with_covariance" value="/sensing/vehicle_velocity_converter/twist_with_covariance"/>
+    </include>
+  </group>
+</launch>

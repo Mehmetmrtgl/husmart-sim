@@ -1,0 +1,7 @@
+# BEYTEPE (RoadRunner -> Autoware)
+# lanelet2_map.osm ve pointcloud_map.pcd, OpenDRIVE (CARLA) yerel çerçevesindedir.
+# Düğümlerdeki local_x / local_y / ele etiketleri doğrudan kullanılır.
+# Çerçeve orijini (xodr geoReference, tmerc k=1):
+#   latitude:  39.87116440956932
+#   longitude: 32.7356890084472
+projector_type: Local

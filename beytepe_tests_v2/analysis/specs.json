@@ -1,0 +1,17 @@
+[
+ {"name": "01_duz_serit", "title": "Düz şerit takibi (doğu yolu)",
+  "start": {"lanelet": 2000024, "frac": 0.15}, "goal": {"ahead": 250}, "timeout": 240},
+ {"name": "02_sola_donus", "title": "Kavşakta sola dönüş (GB kavşağı)",
+  "start": {"lanelet": 2000082, "frac": 0.35}, "goal": {"after": 2000213, "ahead": 40}, "timeout": 200},
+ {"name": "03_saga_donus", "title": "Kavşakta sağa dönüş",
+  "start": {"lanelet": 2000083, "back": 70}, "goal": {"after": 2000101, "ahead": 40}, "timeout": 200},
+ {"name": "04_guney_kuzey", "title": "Güney → kuzey yol bağlantısı (v1'de kopuktu)",
+  "start": {"lanelet": 2000026, "back": 100}, "goal": {"lanelet": 2000026, "frac": 0.33}, "timeout": 300},
+ {"name": "05_serit_degistirme", "title": "Şerit değiştirme (sağ → sol)",
+  "start": {"lanelet": 2000027, "frac": 0.05}, "goal": {"lanelet": 2000024, "frac": 0.9},
+  "lat_dev_limit": 2.6, "timeout": 200},
+ {"name": "06a_uzun_rota_kuzey", "title": "Uzun rota planlama güney → kuzey uç (sürüşsüz)", "drive": false,
+  "start": {"lanelet": 2000082, "frac": 0.35}, "goal": {"lanelet": 2000235, "frac": 0.8}},
+ {"name": "06b_uzun_rota_guney", "title": "Uzun rota planlama kuzey uç → güney (sürüşsüz)", "drive": false,
+  "start": {"lanelet": 2000115, "frac": 0.2}, "goal": {"lanelet": 2000082, "frac": 0.5}}
+]

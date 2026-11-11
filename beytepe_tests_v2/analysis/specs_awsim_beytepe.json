@@ -1,0 +1,4 @@
+[
+ {"name": "awsim_beytepe_01", "title": "AWSIM Beytepe: başlangıç noktasından 400 m ileri otonom sürüş",
+  "start": {"current": true}, "goal": {"ahead": 400}, "timeout": 300, "stuck_s": 60, "lat_dev_limit": 0.5}
+]

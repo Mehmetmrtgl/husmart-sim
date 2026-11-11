@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>husmart_sensor_kit_description</name>
+  <version>0.1.0</version>
+  <description>Hüsmart (Hacettepe Beytepe) sensör kiti: Hesai JT128, Stereolabs ZED X, Xsens MTi-7. AWSIM benzetimi için; konumlar TAHMİNİ.</description>
+  <maintainer email="mehmetmrt1999@gmail.com">mehmet</maintainer>
+  <license>Apache License 2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

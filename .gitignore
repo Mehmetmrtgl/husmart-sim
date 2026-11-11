@@ -1,0 +1,27 @@
+# husmart-sim: büyük ve üretilen dosyalar repoya girmez.
+
+# Nokta bulutları (GitHub Release'ten indirilir; README "Harita")
+*.pcd
+harita/*_karolar/
+# Harita klasöründeki eski elle yedekler (git geçmişi bunların yerini tutar)
+harita/**/*.osm.*
+
+# Autoware'in örnek paketlerinden alınmış başvuru kopyaları (bizim değil)
+autoware_kaynak/
+
+# Tur sonuçları: her turda yeniden yazılır, büyük (yerelde ~/autoware_bags/*_analiz klasörlerinde saklanır)
+beytepe_tests_v2/results_awsim_beytepe/*
+!beytepe_tests_v2/results_awsim_beytepe/.gitkeep
+
+# RoadRunner: yeni yolun .fbx'i AWSIM reposunda (Assets/Beytepe/Model/Beytepe.fbx) birebir aynısıyla duruyor
+roadrunner/Yeni yol/01_RoadRunner_Kaynak/*.fbx
+
+# Python / editör / sistem
+__pycache__/
+*.pyc
+*.err
+*.log
+*.orig
+*.orig_*
+.vscode/
+desktop.ini

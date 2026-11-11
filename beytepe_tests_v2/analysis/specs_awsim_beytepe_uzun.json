@@ -1,0 +1,4 @@
+[
+ {"name": "awsim_beytepe_02_uzun", "title": "AWSIM Beytepe: mevcut konumdan ~5.5 km rota (lanelet 2000162)",
+  "start": {"current": true}, "goal": {"lanelet": 2000162, "frac": 0.5}, "timeout": 2100, "stuck_s": 120, "lat_dev_limit": 0.5}
+]

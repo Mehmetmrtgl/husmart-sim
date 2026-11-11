@@ -1,0 +1,15 @@
+=== 01_duz_serit başlıyor
+=== 01_duz_serit: PASS — hedefe ulaştı, ölçütler sağlandı (süre 66.9 s, sapma max 0.025 m, yavaşlama max 1.1, rota 409.4 m)
+=== 02_sola_donus başlıyor
+=== 02_sola_donus: PASS — hedefe ulaştı, ölçütler sağlandı (süre 41.2 s, sapma max 0.163 m, yavaşlama max 1.12, rota 227.9 m)
+=== 03_saga_donus başlıyor
+=== 03_saga_donus: PASS — hedefe ulaştı, ölçütler sağlandı (süre 45.2 s, sapma max 0.102 m, yavaşlama max 1.12, rota 227.9 m)
+=== 04_guney_kuzey başlıyor
+=== 04_guney_kuzey: PASS — hedefe ulaştı, ölçütler sağlandı (süre 92.9 s, sapma max 0.165 m, yavaşlama max 1.14, rota 919.6 m)
+=== 05_serit_degistirme başlıyor
+=== 05_serit_degistirme: FAIL — şerit sapması 2.274 m > 2.2 (süre 37.0 s, sapma max 2.274 m, yavaşlama max 1.13, rota 146.9 m)
+=== 06a_uzun_rota_kuzey başlıyor
+=== 06a_uzun_rota_kuzey: PASS — rota oluştu (sürüş yapılmadı) (süre None s, sapma max None m, yavaşlama max None, rota 3848.3 m)
+=== 06b_uzun_rota_guney başlıyor
+=== 06b_uzun_rota_guney: PASS — rota oluştu (sürüş yapılmadı) (süre None s, sapma max None m, yavaşlama max None, rota 3062.1 m)
+EXIT=0

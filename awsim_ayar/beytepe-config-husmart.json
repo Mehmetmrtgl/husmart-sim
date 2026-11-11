@@ -1,0 +1,290 @@
+{
+  "TimeScale": 1.0,
+  "TimeSourceType": 3,
+  "RandomTrafficSeed": 0,
+  "MaxVehicleCount": 60,
+  "LogitechG29Settings": {
+    "_devicePath": "/dev/input/event3",
+    "_selfAligningTorqueCoeff": 1.0
+  },
+  "EgoVehicleSettings": {
+    "_maxSteerTireAngleInput": 35,
+    "_maxAccelerationInput": 2,
+    "_maxDecelerationInput": 2
+  },
+  "EgoPose": {
+    "Position": {
+      "x": 185.98,
+      "y": -193.18,
+      "z": 138.14
+    },
+    "EulerAngles": {
+      "x": 0.0,
+      "y": 0.0,
+      "z": 83.8
+    }
+  },
+  "NpcEgo": {
+    "Enabled": true,
+    "CutInEnabled": true,
+    "CutInMargin": 0.5,
+    "CutInPredictSec": 1.0,
+    "YieldEnabled": true,
+    "YieldHorizonSec": 7.0,
+    "YieldMarginSec": 1.5,
+    "YieldMaxDecel": 3.0,
+    "ReleaseWhenEgoWaits": true,
+    "Log": true
+  },
+  "SensorRig": {
+    "Name": "husmart",
+    "HideLexusSensorKit": true,
+    "DisableLexusCamera": true,
+    "Lidars": [
+      {
+        "Name": "ot128_top",
+        "Model": "HesaiPandar128E4X",
+        "FrameId": "ot128_top",
+        "Position": {
+          "x": 0.9,
+          "y": 0.0,
+          "z": 2.0
+        },
+        "RollPitchYawDeg": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "MaxRange": 230.0,
+        "Hz": 10
+      },
+      {
+        "Name": "jt128_front",
+        "Model": "HesaiJT128",
+        "FrameId": "jt128_front",
+        "Position": {
+          "x": 4.0,
+          "y": 0.0,
+          "z": 0.5
+        },
+        "RollPitchYawDeg": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "MaxRange": 0,
+        "Hz": 10,
+        "HorizontalResolutionDeg": 0.8
+      },
+      {
+        "Name": "jt128_front_left",
+        "Model": "HesaiJT128",
+        "FrameId": "jt128_front_left",
+        "Position": {
+          "x": 3.5,
+          "y": 1.0,
+          "z": 0.5
+        },
+        "RollPitchYawDeg": {
+          "x": 0,
+          "y": 0,
+          "z": 45
+        },
+        "MaxRange": 0,
+        "Hz": 10,
+        "HorizontalResolutionDeg": 0.8
+      },
+      {
+        "Name": "jt128_front_right",
+        "Model": "HesaiJT128",
+        "FrameId": "jt128_front_right",
+        "Position": {
+          "x": 3.5,
+          "y": -1.0,
+          "z": 0.5
+        },
+        "RollPitchYawDeg": {
+          "x": 0,
+          "y": 0,
+          "z": -45
+        },
+        "MaxRange": 0,
+        "Hz": 10,
+        "HorizontalResolutionDeg": 0.8
+      },
+      {
+        "Name": "jt128_left",
+        "Model": "HesaiJT128",
+        "FrameId": "jt128_left",
+        "Position": {
+          "x": 1.0,
+          "y": 1.05,
+          "z": 0.5
+        },
+        "RollPitchYawDeg": {
+          "x": 0,
+          "y": 0,
+          "z": 90
+        },
+        "MaxRange": 0,
+        "Hz": 10,
+        "HorizontalResolutionDeg": 0.8
+      },
+      {
+        "Name": "jt128_right",
+        "Model": "HesaiJT128",
+        "FrameId": "jt128_right",
+        "Position": {
+          "x": 1.0,
+          "y": -1.05,
+          "z": 0.5
+        },
+        "RollPitchYawDeg": {
+          "x": 0,
+          "y": 0,
+          "z": -90
+        },
+        "MaxRange": 0,
+        "Hz": 10,
+        "HorizontalResolutionDeg": 0.8
+      },
+      {
+        "Name": "jt128_rear_left",
+        "Model": "HesaiJT128",
+        "FrameId": "jt128_rear_left",
+        "Position": {
+          "x": -0.8,
+          "y": 1.0,
+          "z": 0.5
+        },
+        "RollPitchYawDeg": {
+          "x": 0,
+          "y": 0,
+          "z": 135
+        },
+        "MaxRange": 0,
+        "Hz": 10,
+        "HorizontalResolutionDeg": 0.8
+      },
+      {
+        "Name": "jt128_rear_right",
+        "Model": "HesaiJT128",
+        "FrameId": "jt128_rear_right",
+        "Position": {
+          "x": -0.8,
+          "y": -1.0,
+          "z": 0.5
+        },
+        "RollPitchYawDeg": {
+          "x": 0,
+          "y": 0,
+          "z": -135
+        },
+        "MaxRange": 0,
+        "Hz": 10,
+        "HorizontalResolutionDeg": 0.8
+      },
+      {
+        "Name": "jt128_rear",
+        "Model": "HesaiJT128",
+        "FrameId": "jt128_rear",
+        "Position": {
+          "x": -1.1,
+          "y": 0.0,
+          "z": 0.5
+        },
+        "RollPitchYawDeg": {
+          "x": 0,
+          "y": 0,
+          "z": 180
+        },
+        "MaxRange": 0,
+        "Hz": 10,
+        "HorizontalResolutionDeg": 0.8
+      }
+    ],
+    "Cameras": [
+      {
+        "Name": "zedx_front",
+        "Enabled": true,
+        "Width": 1920,
+        "Height": 1200,
+        "Hz": 15.0,
+        "BaselineM": 0.12,
+        "FocalLengthMm": 2.2,
+        "PixelSizeUm": 3.0,
+        "Position": {
+          "x": 1.65,
+          "y": 0.0,
+          "z": 1.8
+        },
+        "RollPitchYawDeg": {
+          "x": 0,
+          "y": 5,
+          "z": 0
+        }
+      },
+      {
+        "Name": "zedx_rear",
+        "Enabled": true,
+        "Width": 1920,
+        "Height": 1200,
+        "Hz": 15.0,
+        "BaselineM": 0.12,
+        "FocalLengthMm": 2.2,
+        "PixelSizeUm": 3.0,
+        "Position": {
+          "x": -0.15,
+          "y": 0.0,
+          "z": 1.76
+        },
+        "RollPitchYawDeg": {
+          "x": 0,
+          "y": 5,
+          "z": 180
+        }
+      }
+    ],
+    "Ins": {
+      "Enabled": true,
+      "ImuHz": 100,
+      "GnssHz": 4.0,
+      "Position": {
+        "x": 1.2,
+        "y": 0.0,
+        "z": 0.45
+      },
+      "RollPitchYawDeg": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "AntennaPosition": {
+        "x": 0.4,
+        "y": 0.0,
+        "z": 1.82
+      },
+      "Noise": true
+    }
+  },
+  "Gokyuzu": {
+    "Acik": true,
+    "Ust": [
+      0.1,
+      0.32,
+      0.95
+    ],
+    "Orta": [
+      0.42,
+      0.65,
+      1.0
+    ],
+    "Alt": [
+      0.75,
+      0.82,
+      0.92
+    ],
+    "Yayilma": 1.6,
+    "Pozlama": 14.0
+  }
+}
