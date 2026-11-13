@@ -90,22 +90,18 @@ Rules:
 - Stop AWSIM before building it.
 - The default is `ROS_DOMAIN_ID=61`. If you change it, give both scripts the same value.
 
-### Teleporting the vehicle
+### Teleporting the vehicle and reading its position
 
-While AWSIM is running, this moves the vehicle to a map pose (x, y, z in metres; yaw in degrees). Example: the start point.
+With AWSIM running (Autoware is not needed):
 
-    docker run --rm --net host -u $(id -u) -e HOME=/tmp -e ROS_DOMAIN_ID=61 -e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
-      -e CYCLONEDDS_URI=file:///c.xml -v $PWD/cyclonedds.xml:/c.xml:ro --entrypoint bash \
-      ghcr.io/autowarefoundation/autoware@sha256:b7490c70ba67c85a20d94feba68137ba911b5032c621353d50f0c63d3ee63977 -c '
-      source /opt/autoware/setup.bash; python3 -c "
-    import rclpy,math,time; from geometry_msgs.msg import PoseWithCovarianceStamped as P
-    x,y,z,yaw=181.45,-192.69,138.6,83.7
-    rclpy.init(); n=rclpy.create_node(\"isinla\"); p=n.create_publisher(P,\"/awsim/awsim_rviz_plugins/pose_teleport/pose_with_covariance\",1)
-    m=P(); m.header.frame_id=\"map\"; m.pose.pose.position.x,m.pose.pose.position.y,m.pose.pose.position.z=x,y,z
-    m.pose.pose.orientation.z=math.sin(math.radians(yaw)/2); m.pose.pose.orientation.w=math.cos(math.radians(yaw)/2)
-    time.sleep(1.5); [ (p.publish(m), time.sleep(0.3)) for _ in range(3) ]"'
+    ./isinla.sh                      # list of known places
+    ./isinla.sh nizamiye             # teleport to a known place (baslangic, nizamiye, yurt)
+    ./isinla.sh -150.2 2640.5 270    # teleport to x y [heading°] (map frame; 0 = east, 90 = north)
+    ./konum.sh                       # print the current x, y, heading and the matching ./isinla.sh command
+    ./konum.sh "missing road here"   # also append the position and the note to notlar/konumlar.txt
 
-Known poses: start (181.45, −192.69, 138.6, 83.7), main gate (−141.8, 2626.0, 5.6, 95), dormitory (−24.0, 1360.6, 68.4, 5.2).
+The height is taken from the nearest lane in the map. To add a named place, add a line to the `YERLER` list at the top of
+`isinla.sh`. If Autoware is running, localization may lose track after a teleport; re-initialize with **2D Pose Estimate** in RViz.
 
 ## 4. Test tour
 
@@ -136,6 +132,7 @@ Never run two `ros2 bag record` at once: their node names collide and autonomous
 | `roadrunner/` | RoadRunner sources (`.rrscene`, `.xodr`, `.geojson`), the first Autoware maps, conversion notes |
 | `beytepe_tests_v2/` | Tour scenarios (`analysis/specs_*.json`), tour runner, analysis scripts, older test reports |
 | `docs/ust_bakis/` | Top-down views of the simulation map (with buildings) and `beytepe_sim.kml` for Google Earth |
+| `isinla.sh`, `konum.sh` | Teleport the vehicle in AWSIM / print its position (section 3) |
 | `tools/` | Helpers (texture generation, bag inspection) |
 | `run_e2e_sim.sh`, `run_planning_sim.sh`, `record_bag.sh`, `run_unityhub.sh` | Old scripts (Shinjuku demo / Lexus sensors); not needed for Beytepe |
 
@@ -152,8 +149,9 @@ Difference: there, Autoware's `sample_sensor_kit` package is modified and Autowa
 - Sensor poses are **estimates**; the vehicle has not been measured. Once it is, update
   `husmart_sensor_kit/.../sensors_calibration.yaml` and `awsim_ayar/beytepe-config-husmart.json` together.
 - The JT128s are mounted upright at 0.5 m: low objects (below ≈0.4 m) within ~2 m of the body are not seen.
-- At the main gate, the real U-turn is south of (in front of) the guardhouse and the road widens to 4 lanes; in the simulation
-  it loops around the guardhouse. To be fixed.
+- Main gate (2026-11-13): rebuilt from a hand drawing over Google Earth imagery (U-turn south of the guardhouse, 3 exit lanes,
+  2 entry lanes, bus-stop bay). The imagery is offset from the map by about 0.9 m west / 1.25 m south (measured with lidar), and
+  the drawing was shifted by that amount. Not yet validated with a full tour; small details may still differ from reality.
 - Buildings may be offset by 1-2 m (OpenStreetMap footprints).
 - Real-vehicle drivers are not wired up (OT128: Nebula `Pandar128E4X`; JT128 needs Hesai's HesaiLidar_ROS_2.0).
 

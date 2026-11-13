@@ -25,3 +25,4 @@ __pycache__/
 *.orig_*
 .vscode/
 desktop.ini
+notlar/
