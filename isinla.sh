@@ -7,7 +7,8 @@
 #   ./isinla.sh -150.2 2640.5         # x y (metre, harita çerçevesi; yön 90° = kuzey)
 #   ./isinla.sh -150.2 2640.5 270     # x y yön (derece; 0 = doğu, 90 = kuzey, 180 = batı, 270 = güney)
 #
-# Yükseklik haritadaki en yakın şerit noktasından alınır (+0.8 m; araç yere düşer).
+# Yüksekliği AWSIM kendisi bulur (yukarıdan inen ışının çarptığı ilk yüzey); yazılan z haritadaki en yakın şerit noktasından.
+# Mesaj yalnızca BİR kez gönderilir: ikinci mesaj aracı kendi tavanının üstüne koyar (araç düşer, fizik bozulabilir).
 # x y değerlerini ./konum.sh verir. Yeni bir yer eklemek için aşağıdaki YERLER listesine bir satır yazın.
 # Not: Autoware açıkken ışınlarsanız konum bulma (NDT) şaşırabilir; gerekirse RViz'de "2D Pose Estimate" ile düzeltin.
 set -e
@@ -56,7 +57,13 @@ pub = n.create_publisher(P, "/awsim/awsim_rviz_plugins/pose_teleport/pose_with_c
 msg = P(); msg.header.frame_id = "map"
 msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z = x, y, z
 msg.pose.pose.orientation.z = math.sin(math.radians(yon) / 2); msg.pose.pose.orientation.w = math.cos(math.radians(yon) / 2)
-time.sleep(1.5)
-for _ in range(3): pub.publish(msg); time.sleep(0.3)
+t0 = time.time()
+while pub.get_subscription_count() == 0 and time.time() - t0 < 10: time.sleep(0.1)
+if pub.get_subscription_count() == 0:
+    print("HATA: AWSIM ışınlama konusunu dinlemiyor (AWSIM açık mı, ROS_DOMAIN_ID aynı mı?)"); raise SystemExit(1)
+time.sleep(0.5)
+# Only ONE message: AWSIM puts the car on the first surface a ray from above hits. A second message
+# while the car is already there hits the car roof and lifts it ~3 m; the long drop can break the physics.
+pub.publish(msg); time.sleep(0.5)
 print("Işınlandı: x %.1f  y %.1f  z %.1f  yön %.0f°" % (x, y, z, yon))
 EOF'

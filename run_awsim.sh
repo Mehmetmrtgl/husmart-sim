@@ -15,6 +15,10 @@ case " $* " in *" --json_path "*) ;; *) set -- "$@" --json_path "$DIR/awsim_ayar
 if ! ip link show lo | grep -q MULTICAST; then
   echo "UYARI: lo üzerinde multicast kapalı. Önce: sudo ip link set lo multicast on"; exit 1
 fi
+# cyclonedds.xml asks for a 10 MB socket receive buffer; below that DDS cannot start and AWSIM runs without ROS.
+if [ "$(cat /proc/sys/net/core/rmem_max)" -lt 10485760 ]; then
+  echo "UYARI: net.core.rmem_max çok küçük ($(cat /proc/sys/net/core/rmem_max)); AWSIM ROS'a bağlanamaz. Önce: sudo sysctl -w net.core.rmem_max=2147483647"; exit 1
+fi
 
 env -i HOME="$HOME" USER="$USER" PATH=/usr/bin:/bin DISPLAY="${DISPLAY:-:21.0}" \
   XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}" XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}" \

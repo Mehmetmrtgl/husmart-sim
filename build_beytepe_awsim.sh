@@ -8,6 +8,14 @@
 #   BEYTEPE_BUILD=$HOME/awsim/Beytepe-Gercek-Build/AWSIM-Beytepe.x86_64 ~/autoware/build_beytepe_awsim.sh
 # Değişken verilmezse eskisi gibi RoadRunner modeli + beytepe_yeni_v2 + ~/awsim/Beytepe-Build derlenir.
 set -e
+# The player is written into the folder AWSIM runs from: building while AWSIM is open replaces the files under the
+# running program (the vehicle then behaves wildly) and the executable itself cannot be replaced.
+if ps -eo cmd | grep -q "[A]WSIM-Beytepe.x86_64"; then
+  echo "HATA: AWSIM açık. Önce AWSIM'i kapatın (pencereyi kapatın ya da: pkill -f AWSIM-Beytepe.x86_64), sonra tekrar derleyin."; exit 1
+fi
+if ps -eo cmd | grep -q "[U]nity -batchmode.*BeytepeSceneBuilder"; then
+  echo "HATA: bir AWSIM derlemesi zaten çalışıyor."; exit 1
+fi
 UNITY=${UNITY:-$HOME/Unity/Hub/Editor/6000.0.61f1/Editor/Unity}
 PROJECT=${AWSIM_SRC:-$HOME/awsim/AWSIM-src}   # husmart-awsim reposunun klonu (beytepe dalı)
 LOG=${BEYTEPE_LOG:-$HOME/awsim/beytepe_unity_build.log}

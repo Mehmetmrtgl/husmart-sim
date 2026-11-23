@@ -1,0 +1,117 @@
+# Beytepe map / simulation editing tool settings.
+# Paths are relative to the repo root (husmart-sim) unless they start with ~ or /.
+
+yollar:
+  temel_harita: harita/beytepe_yeni_v2/temel/lanelet2_map.osm   # original lanelet map before the gate edit (input)
+  harita: harita/beytepe_yeni_v2/lanelet2_map.osm                # generated lanelet map (output)
+  temel_bulut: harita/beytepe_yeni_v2/temel/pointcloud_map.pcd   # original point cloud (input, from Release v0.1)
+  bulut: harita/beytepe_yeni_v2/pointcloud_map.pcd               # generated point cloud (output)
+  karolar: harita/beytepe_yeni_v2_karolar                        # generated 50 m tiles (output)
+  cizim_kml: tools/beytepe_duzenle/veri/nizamiye_cizim.kml       # Google Earth drawing of the gate (input)
+  ara: tools/beytepe_duzenle/uretilen                           # intermediate files (generated, not in git)
+  refuj_nesneler: tools/beytepe_duzenle/veri/refuj_nesneler.json  # median lamps + trees (output of "refuj-tespit", input of "awsim")
+  refuj_guney_nesneler: tools/beytepe_duzenle/veri/refuj_guney_nesneler.json  # south median lamps + trees (output of "refuj-guney-tespit")
+  nizamiye_nesneler: tools/beytepe_duzenle/veri/nizamiye_nesneler.json  # gate barriers, flags, wall, fence ... (measured by hand, input of "awsim")
+  awsim_veri: ~/awsim/AWSIM-src/Assets/Beytepe/Data/duzenlemeler.json   # AWSIM scene data (output)
+  awsim_bulut: ~/awsim/beytepe_nizamiye_bulut.bin                # point cloud written by the AWSIM build (input of "bulut")
+  sim_kml: docs/ust_bakis/beytepe_sim.kml                        # simulation lanes for Google Earth (output of "kml")
+  yedek: ~/yedek/beytepe_duzenle                                 # every overwritten file is copied here first
+  # real-vehicle data (only for "refuj-tespit" and "kontrol"; not in the repo)
+  gercek_lidar: ~/autoware_map/beytepe_gercek_v1/pointcloud_map.pcd
+  gercek_poz: ~/harita_gercek/poz_v4.npz
+  zed_video: ~/harita_gercek/zed/sol_sag.hevc
+  zed_zaman: ~/harita_gercek/zed/zaman_ns.npy
+  zed_konteyner: autoware_harita        # docker container with ffmpeg; ~/harita_gercek is mounted as /is
+  zed_konteyner_video: /is/zed/sol_sag.hevc   # the same video as seen inside that container
+
+cizim:
+  # Google Earth imagery is offset from the map frame; measured with real lidar walls and existing lanes.
+  goruntu_kaymasi_m: [0.9, 1.25]        # added to the drawing: +x (east), +y (north)
+  # names of the placemarks in the KML
+  rota:
+    cikis_sol: "sol çıkış araç gidiş"
+    cikis_sag: "sağ çıkış araç rota"
+    cikis_cep: "çıkış cep araç rota"
+    giris_sol: "giriş sol araç rota"
+    giris_sag: "giriş sağ araç rota"
+    giris_cep: "giriş sağ cep araç rota"
+    donus: "çıkıştan girişe u dönüşü araç rota"
+  asfalt: ["çıkış sol güvenlik", "çıkış sağ cep", "çıkış sağ şerit", "nizamiye dönüş", "ring dönüş",
+           "giriş sağ şerit", "giriş sağ cep", "çıkış sol şerit", "giriş sol şerit"]
+  ada: ["kaldırım ve peyzaj"]
+  durak: "durak yeri"
+  kulube: ["büyük güvenlik", "küçük güvenlik"]   # guard booths: the island under a booth is fully paved
+
+nizamiye:
+  serit_genislik: 3.5
+  kuzey_baglanti_y: 2618.3      # new lanes start at the end of the existing northbound lanes (speed bump stays)
+  guney_baglanti_y: 2550.0      # new entry lanes join the existing southbound lanes here
+  kuzey_uc_y: 2760.0            # north end of the new exit / entry lanes (map edge)
+  sag_catal_y: 2654.25          # right exit lane forks into exit / exit pocket
+  cep_catal_y: 2733.85          # right entry lane forks into the bus-stop bay
+  cep_birlesme_y: 2562.65       # bus-stop bay merges back
+  cep_giris_uzatma_m: 15.0      # bay entry curve is extended this far past the drawn corner
+  hiz_siniri: 64
+  not: "nizamiye 2026-11-13 (kullanıcı çizimi v2)"   # prefix of the "note" tag of the new lanes
+  # existing map elements the new lanes connect to (ids in the base map)
+  kuzey_baslangic_dugumleri: ["3722", "1014", "604"]   # north ends of the existing northbound borders (left, middle, right)
+  guney_yollari: ["2000350", "2000316", "2000317"]     # existing southbound borders (left, middle, right), cut at guney_baglanti_y
+  kirpilacak_yollar: ["1000222", "1000032", "1000423"] # old borders that lose their nodes north of the junction
+  awsim:
+    izgara: [-200.0, -110.0, 2530.0, 2770.0, 0.5]   # x0 x1 y0 y1 resolution of the terrain-regrade grid
+    sev_m: 8.0                  # cut / fill slope width around the new road
+    bosluk_doldur_m: 1.3        # gaps between lanes narrower than 2x this become asphalt
+    eski_seritler: ["2000205", "2000115"]   # base-map southbound lanes whose northern part was removed (becomes grass)
+    mevcut_yol_kenar_m: 1.0     # existing lanes + this margin (gutter, curb) keep their RoadRunner shape (no regrade)
+    ada_tumsek: 0.10            # grass mound of those islands
+    ada_kose_yaricap_m: 1.5     # island curb corners are rounded with this radius
+    ada_dolgu_m: 15.0           # undrawn open areas up to 2x this wide next to an island become asphalt (no bare ground at road level)
+    eski_yol_cim_m: 6.0         # old RoadRunner road pieces within this distance of the new asphalt turn into grass ...
+    mevcut_yol_koruma_m: 2.0    # ... except within this distance of the existing lanes (their shoulders stay)
+    baglanti_rampa_m: 6.0       # where the new lanes join the existing ones, the new asphalt starts lower and rises over this length
+    baglanti_alcalma_m: 0.06    # ... starting this much lower than its normal height (+2 cm), i.e. just under the old road
+
+refuj:
+  kaldirim_genislik: 1.75
+  kaldirim_yukseklik: 0.18
+  tumsek: 0.25                  # grass mound height in the middle
+  lamba_boy: 9.5
+  lamba_kol: 2.6
+  lamba_aralik: 45.3            # typical spacing of the median lamps
+  sabit_lamba_y: [2581.2]       # lamps confirmed in lidar + camera (anchors)
+  kamera_lamba_y: [2628.0, 2658.0]   # lamps found only in the camera frames
+  kenar_payi_m: 0.3             # the curb stands this far inside the lane edge (the yellow edge line stays visible); asphalt in between
+  bulut_kenar_m: 14.0           # point-cloud update region = median + this margin (covers both carriageways)
+  # lanes along the median (ids in the generated map; the new gate lanes are added from nizamiye_plan.json)
+  # the median runs from the campus junction (y ~300) to the gate U-turn as ONE island (2026-11-23: it used to start at y 1700)
+  dogu_seritler: ["2000248", "2000284", "2000256", "2000188", "2000224", "2000092", "2000104", "2000132"]   # northbound lanes, south -> north (then new A1, A2)
+  bati_serit: "2000205"                   # existing southbound lane south of the new entry lanes (after new G1c, G1d)
+  bati_seritler_ek: ["2000130", "2000138", "2000128", "2000253"]   # ... continued southwards to the junction
+  eksen_baslangic_y: 300.0                # the median axis starts north of this y
+  yaya_gecidi_boslugu_m: 0.5              # the median is cut where a crosswalk crosses it (crosswalk + this margin)
+  guney:                                  # lamp/tree detection for the south part of the median (refuj-guney-tespit); the island itself is the one above
+    dogu_seritler: ["2000248", "2000284", "2000256", "2000188", "2000224", "2000092", "2000104"]   # northbound lanes, south -> north (inner border = left)
+    bati_seritler: ["2000138", "2000128", "2000253"]                        # southbound lanes, north -> south (inner border = left)
+    y_bas: 300.0                          # detection starts north of this y (junction at the south end)
+    y_son: 1705.0                         # ... and ends here, where the north detection (refuj_nesneler, trees from y 1708) takes over
+    lamba_aralik: 45.3                    # assumed spacing of the median lamps where the lidar shows none (gaps filled only between lidar lamps)
+
+cizgiler:                       # lane marking colours as on the real road: solid (edge, curb side) yellow, dashed lane lines white
+  bolge_kenar_m: 12.0           # RoadRunner markings are recoloured within this distance of the median (both carriageways)
+  guney_sinir_y: 1708.0         # ... north of this y (the campus junction south of the median is left as it is)
+
+bulut:
+  yogunluk: 5.0                 # points per m2 when sampling the AWSIM scene
+  karo_m: 50
+
+kamera:                         # ZED left camera of the real vehicle (for "kontrol")
+  K: [645.2687, 646.0174, 484.1298, 300.4555]      # fx fy cx cy
+  D: [-0.05641, -0.06796, 0.00098, -0.00024]       # k1 k2 p1 p2
+  zaman_kaymasi_s: 0.00765
+  T_il_euler_xyz: [-0.021590, 0.010479, 1.855427]  # INS <- lidar rotation (rad) and translation (m)
+  T_il_t: [-0.006675, -0.006293, 0.154110]
+  T_ci: [[-0.003846395003084027, -0.9999767439198289, 0.00563177280926086, 0.06544206321207238],
+         [0.01179286511620814, -0.0056767824713887995, -0.9999143475683911, 0.042789840037205935],
+         [0.9999230638293274, -0.003779650812894386, 0.011814426008123111, -0.030043351177203036],
+         [0, 0, 0, 1]]
+  genislik: 960                 # the video is left|right side by side; the left half is used
