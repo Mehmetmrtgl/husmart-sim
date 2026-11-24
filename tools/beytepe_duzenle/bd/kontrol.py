@@ -109,6 +109,9 @@ def calistir(A, y0, y1, yon='hepsi', adet=8, x0=None, x1=None):
     np_ = yol(Y.get('nizamiye_nesneler', ''))
     if np_ and os.path.exists(np_):
         v = json_oku(np_)
+        from . import korkuluk                       # guardrails / parapets along the route (veri/korkuluklar.json)
+        kk = korkuluk.geometri(A, H, sessiz=True) or {}
+        v['korkuluklar'] = v.get('korkuluklar', []) + kk.get('korkuluklar', []); v['duvarlar'] = v.get('duvarlar', []) + kk.get('duvarlar', [])
         direkler += [(o['x'], o['y'], 1.0 + o.get('kol_boy', 3.8), (255, 140, 0), 'bariyer') for o in v.get('bariyerler', [])]
         direkler += [(o['x'], o['y'], o['boy'], (255, 255, 255), 'bayrak') for o in v.get('bayraklar', [])]
         direkler += [(o['x'], o['y'], o.get('boy', 3.0), (255, 60, 60), 'kulube') for o in v.get('kulubeler', [])]

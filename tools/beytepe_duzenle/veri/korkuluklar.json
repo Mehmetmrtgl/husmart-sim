@@ -1,0 +1,18 @@
+{
+  "aciklama": "Steel guardrails (W-beam) and concrete parapets along the tour route, ROS map frame. Ends (bas / son) were read in the real lidar map and ZED frames; the line between them follows the simulated road edge (lanelet area outline) at ofset_m outside it (bd/korkuluk.py). 'ara' = points near the right stretch of edge (picks the side of the outline). uclar = end at bas / son: 'gomulu' = the beam slopes down into the ground over 4 m (real terminals), 'duz' = cut (meets a wall). Real rail face: 1.3 m (median) outside the simulated road edge on the main road.",
+  "korkuluklar": [
+    {"ad": "kuzey_kampus_anayol_dogu", "bas": [-59.5, 203.5], "son": [-30.44, 1456.17], "ara": [[-120.0, 216.0], [-151.0, 290.0], [-100.0, 500.0], [-40.0, 1000.0]],
+     "ofset_m": 1.3, "uclar": ["gomulu", "gomulu"],
+     "not": "north campus road (right side going west, starts after the crosswalk at the curve) round the corner and along the east edge of the main road to y 1456 (concrete kerb and hedge after it): one rail, as in the ZED frames (2026-11-23); before, the scene rail started abruptly at y 313"},
+    {"ad": "anayol_dogu_2a", "bas": [-44.97, 1605.44], "son": [-46.6, 1621.3], "ofset_m": 1.3, "uclar": ["gomulu", "gomulu"],
+     "not": "short rail between the side road (y ~1600) and the crosswalk (y 1624.7)"},
+    {"ad": "anayol_dogu_2b", "bas": [-51.23, 1683.4], "son": [-75.21, 1952.06], "ara": [[-60.0, 1780.0]], "ofset_m": 1.3, "uclar": ["duz", "gomulu"],
+     "not": "starts at the end of the white concrete parapet (y 1682), ends where the real rail ends (no rail, wire fence further back to y 2411)"},
+    {"ad": "anayol_dogu_3", "bas": [-115.79, 2411.01], "son": [-136.32, 2641.86], "ara": [[-125.0, 2520.0]], "ofset_m": 1.3, "uclar": ["gomulu", "gomulu"],
+     "not": "y 2411 (real terminal sloping into the ground) to the gate"}
+  ],
+  "beton_duvarlar": [
+    {"ad": "anayol_dogu_parapet", "bas": [-46.51, 1625.6], "son": [-51.13, 1682.4], "ofset_m": 1.3, "boy": 1.0, "kalinlik": 0.25,
+     "not": "white concrete parapet right after the crosswalk (y 1625.6 .. 1682.4, ~1.0 m above the road), ZED frames 1478-1510 (v6); the scene had a steel rail here"}
+  ]
+}

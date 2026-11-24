@@ -20,6 +20,9 @@ araç). Kavşak girişinde şerit değiştirme iptal olunca planlama "ani kayma"
     (en az junction_reserve_min) uzaktaysa başlanır;
   * sol şeritteyken kavşak / şerit sonu return_lookahead_s x hız + lc_dist içine girince sağa dönülür (eskiden 60 m);
   * Autoware'in geçici reddinden sonra istek 1 s'de bir yeniden gönderilir (eskiden 3 s).
+Rota sol şeridi gerektirirken sağa dönüş (2026-11-24, 24. tur): asıl rota zaten sol şeritteyse sollamadan sonra sağ şerit
+keep_right_need + return_lookahead_s x hız boyunca rotada sürmüyorsa solda kalınır; başlamamış sağa dönüş, rota
+keep_right_release içinde sol şeridi gerektirince iptal edilir (nizamiye U dönüşü sol şeritten yapılır).
 
 Mekanizma (Autoware ayarı değiştirilmez)
   * Sola geçiş / geri dönüş: /planning/mission_planning/manual_lane_change_handler/set_preferred_lane
@@ -830,6 +833,21 @@ def run_node():
                 return
 
             if self.state == "GECIS":
+                # Asıl rota bu bölümde zaten sol şeritteyse sağa dönüş yalnızca "sağdan git" eğilimidir. Sağ şerit
+                # keep_right_need + return_lookahead_s x hız boyunca rotada sürmüyorsa (ör. nizamiye U dönüşü sol şeritten)
+                # solda kalınır, sollama burada biter. (Tur 24: 320 m kala yavaş aracın arkasına dönüş istendi, şerit
+                # değişimi çatala kadar sürdü, araç rotada olmayan sağ çıkış şeridine girip takıldı.)
+                if orig_side == "left" and right_id is not None:
+                    need_r = P["keep_right_need"] + v * P["return_lookahead_s"]
+                    rc = self.lm.corridor(right_id, 0.0, need_r + 20.0, self.route_ids)
+                    if not self.lane_in_route_ahead(rc, rc.project(x, y)[0], need_r):
+                        self.want_lane(2, "sollama solda bitti: rota ileride sol şeridi gerektiriyor")
+                        self.stats["completed"] += 1
+                        self.cooldown_until = t + P["cooldown_ok_s"]
+                        self.goto("TAKIP", f"sollama tamam, solda kalındı: sağ şerit {need_r:.0f} m içinde rotadan ayrılıyor "
+                                           f"(sollama başlayan {self.stats['started']}, biten {self.stats['completed']}, "
+                                           f"vazgeçilen {self.stats['aborted']}; sağa geçiş {self.stats['keep_right']})")
+                        return
                 # Sol şeritteyiz. Sağa dönüş (asimetrik MOBIL): kazanç > Δa_th - Δa_bias ve sağ şeritte arkamızda
                 # kalacak araç (çoğu zaman geçtiğimiz araç) için ã_n >= -b_safe. Sol şeritte önde yavaş araç varsa
                 # sağdan geçme yasağı nedeniyle sağ şeritteki ivmemiz ona göre sınırlanır.
@@ -898,6 +916,17 @@ def run_node():
                     self.want_side("left", orig_side, "ardışık sollama")
                     self.goto("GECIS", f"ardışık sollama: dönüş iptal, sağ şeritte {c['gap_front']:.0f} m önde {c['v'] * 3.6:.0f} km/sa araç")
                     return
+                # Dönüş henüz başlamadıysa ve rota keep_right_release içinde sol şeridi gerektiriyorsa dönüşten vazgeç
+                # (başlamış şerit değişimini kesmek planlamada ani kayma / MRM yapar: o zaman bitmesi beklenir).
+                if in_left and orig_side == "left" and right_id is not None:
+                    rc = self.lm.corridor(right_id, 0.0, P["keep_right_release"] + 20.0, self.route_ids)
+                    lcs = self.lc_state("right")
+                    started = abs(corr.project(x, y)[1]) > 0.5 or (lcs is not None and lcs[0] == "YURUTULUYOR")
+                    if not started and not self.lane_in_route_ahead(rc, rc.project(x, y)[0], P["keep_right_release"]):
+                        self.want_lane(2, f"sağa dönüş iptal: rota {P['keep_right_release']:.0f} m içinde sol şeridi gerektiriyor")
+                        self.cooldown_until = t + P["cooldown_s"]
+                        self.goto("TAKIP", f"sağa dönüş iptal: sağ şerit {P['keep_right_release']:.0f} m içinde rotadan ayrılıyor")
+                        return
                 if in_right or right_id is None:                  # sağ şeritteyiz (ya da tek şerit)
                     self.cooldown_until = t + P["cooldown_ok_s"]
                     if self.return_kind == "sollama":

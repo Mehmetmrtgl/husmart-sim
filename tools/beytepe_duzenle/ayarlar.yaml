@@ -12,6 +12,8 @@ yollar:
   refuj_nesneler: tools/beytepe_duzenle/veri/refuj_nesneler.json  # median lamps + trees (output of "refuj-tespit", input of "awsim")
   refuj_guney_nesneler: tools/beytepe_duzenle/veri/refuj_guney_nesneler.json  # south median lamps + trees (output of "refuj-guney-tespit")
   nizamiye_nesneler: tools/beytepe_duzenle/veri/nizamiye_nesneler.json  # gate barriers, flags, wall, fence ... (measured by hand, input of "awsim")
+  yol_kenari_nesneler: tools/beytepe_duzenle/veri/yol_kenari_nesneler.json  # trees along the tour route (output of "kenar-tespit", input of "awsim")
+  korkuluklar: tools/beytepe_duzenle/veri/korkuluklar.json         # guardrails + concrete parapets along the tour route (ends measured by hand, input of "awsim")
   awsim_veri: ~/awsim/AWSIM-src/Assets/Beytepe/Data/duzenlemeler.json   # AWSIM scene data (output)
   awsim_bulut: ~/awsim/beytepe_nizamiye_bulut.bin                # point cloud written by the AWSIM build (input of "bulut")
   sim_kml: docs/ust_bakis/beytepe_sim.kml                        # simulation lanes for Google Earth (output of "kml")
@@ -96,9 +98,26 @@ refuj:
     y_son: 1705.0                         # ... and ends here, where the north detection (refuj_nesneler, trees from y 1708) takes over
     lamba_aralik: 45.3                    # assumed spacing of the median lamps where the lidar shows none (gaps filled only between lidar lamps)
 
-cizgiler:                       # lane marking colours as on the real road: solid (edge, curb side) yellow, dashed lane lines white
-  bolge_kenar_m: 12.0           # RoadRunner markings are recoloured within this distance of the median (both carriageways)
-  guney_sinir_y: 1708.0         # ... north of this y (the campus junction south of the median is left as it is)
+yol_kenari:                     # trees along the tour route (kenar-tespit; real lidar map around the real drive = tour route)
+  koridor_m: 22.0               # corridor half-width around the drive: RoadRunner eucalyptus trees inside are replaced by measured ones
+  parca_m: 150.0                # the corridor is cut into pieces of this length (no holes; point-cloud regions)
+  govde_h: [0.7, 2.3]           # trunk slice above the ground
+  tac_min_m: 3.0                # tree top at least this high ...
+  yayilim_min_m: 1.2            # ... and its crown at least this wide (90th percentile radius): poles, signs and cars have none
+  boy_max_m: 20.0               # taller tops are clipped (lidar ghosts above a crown)
+  yol_payi_m: 0.5               # a trunk stays this far from every lane
+  ada_payi_m: 0.5               # ... and from the median / gate islands (they have their own trees)
+
+cizgiler:                       # lane marking colours on the tour roads, as in the real ZED frames (2026-11-23); RoadRunner has them the other way round
+  # rules: lane divider (same direction) and the centre line of a two-way road -> white; road edge (also the median side) -> yellow
+  rota_m: 10.0                  # recoloured: lanelets with >= rota_oran of their centre line within this distance of the real drive (= tour route)
+  rota_oran: 0.6
+  sari_orta_kutu: [-235.0, -195.0, -270.0, 240.0]   # x0 x1 y0 y1: west campus road, the line between the two directions is yellow (bollards on it)
+  beyaz_dis_kenar_refuj_m: 16.0 # outer (right) edge of the southbound main road (within this distance of the median) is white ...
+  sari_dis_kenar_y: [1445.0, 1565.0]   # ... except here (yellow, beside the retaining wall)
+  # campus roads: RoadRunner has a light concrete gutter strip (~0.5 m) along the curb instead of a painted edge line;
+  # gutter running along a tour edge becomes asphalt, its road-side oluk_cizgi_m the edge colour (real: yellow line by the curb)
+  oluk_cizgi_m: 0.15
 
 bulut:
   yogunluk: 5.0                 # points per m2 when sampling the AWSIM scene

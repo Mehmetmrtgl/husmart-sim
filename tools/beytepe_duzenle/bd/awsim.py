@@ -336,30 +336,99 @@ def kaplama_kontrol(A, H, sekil, ring):
 
 
 def cizgi_renk_verisi(A, H, ring):
-    """RoadRunner draws this road's lines the other way round (yellow dashed, white edges). Region (both carriageways
-    along the median) + the lanelet lines as segments: solid -> yellow, dashed -> white. The scene builder recolours each
-    RoadRunner marking triangle after the lanelet line it lies on."""
-    from shapely.geometry import Polygon as SP, box, LineString
-    Z = A['cizgiler']
-    bolge = SP(ring).buffer(0).buffer(Z['bolge_kenar_m'])
-    bolge = bolge.intersection(box(-1e4, Z['guney_sinir_y'], 1e4, 1e4)).simplify(0.5)
-    if bolge.geom_type != 'Polygon':
-        bolge = max(bolge.geoms, key=lambda g: g.area)
-    sari, beyaz = [], []
+    """RoadRunner draws the tour roads' lines the other way round (yellow centre / dashes, white edges). Every painted line of
+    a lanelet on the tour route (real drive) gets the colour seen in the real ZED frames, from its role in the map:
+      shared by two lanelets of the same direction (lane divider)        -> white
+      shared by two opposite lanelets (centre line of a two-way road)    -> white (yellow on the west campus road: sari_orta_kutu)
+      only one lanelet, its right side (outer edge)                      -> yellow (white on the southbound main road, except sari_dis_kenar_y)
+      only one lanelet, its left side (median-side edge)                 -> yellow
+    Every rule is decided per segment (a lanelet line can be over 1 km long and curve away from the median).
+    Output: region (box around the lines) + the lines as segments; the scene builder recolours each RoadRunner marking
+    triangle after the lanelet line it lies on (0.6 m, parallel); markings off these lines (crossings, arrows) stay.
+    Two more passes:
+      kenar_*_xy: the edge lines again, turned so that the road is on their left (ax ay bx by). On the campus roads RoadRunner
+                  has no painted edge line but a light concrete gutter strip (~0.5 m) along the curb, where the real road has
+                  asphalt and a yellow edge line: gutter triangles running along an edge become asphalt, their road-side
+                  oluk_cizgi_m the edge colour. The virtual outer borders of junction lanelets count as edges here (only
+                  here): where a curb runs past a side road, RoadRunner has a gutter along them too
+      alan:       rings of the tour lanelet area (even-odd; without the gate and sari_orta_kutu): RoadRunner's yellow centre
+                  lines through junctions, where the lanelet borders are virtual, become white, if they run along the road
+                  (nearest lanelet line within 5 m, virtual borders sanal_xy included; speed-bump stripes run across it)"""
+    import collections
+    from shapely.geometry import Polygon as SP, Point, box as SBox
+    from shapely.ops import unary_union
+    from scipy.spatial import cKDTree
+    from .kenar import gercek_iz
+    Z = A['cizgiler']; tiz = cKDTree(gercek_iz(A, 2.0)); REF = SP(ring).buffer(0)
+    rol = collections.defaultdict(list); tur = set(); poly = {}
     for lid, (m, t) in H.R.items():
         if t.get('type') != 'lanelet' or t.get('subtype', 'road') != 'road' or 'left' not in m:
             continue
-        for w in (m['left'], m['right']):
-            alt = H.WT[w].get('subtype'); P = H.P(w)[:, :2]
-            if H.WT[w].get('type') not in ('line_thin', 'line_thick') or alt not in ('solid', 'dashed') or len(P) < 2:
-                continue
-            if not bolge.intersects(LineString(P)):
-                continue
-            hedef = sari if alt == 'solid' else beyaz
+        L, R = H.P(m['left'])[:, :2], H.P(m['right'])[:, :2]
+        C = (L[np.linspace(0, len(L) - 1, 10).astype(int)] + R[np.linspace(0, len(R) - 1, 10).astype(int)]) / 2
+        if (tiz.query(C)[0] < Z['rota_m']).mean() >= Z['rota_oran']:
+            tur.add(lid)
+        if np.dot(L[-1] - L[0], R[-1] - R[0]) < 0:
+            R = R[::-1]
+        poly[lid] = SP(np.r_[L, R[::-1]]).buffer(0)
+        rol[m['left']].append((lid, 'left')); rol[m['right']].append((lid, 'right'))
+    kx0, kx1, ky0, ky1 = Z['sari_orta_kutu']; sy0, sy1 = Z['sari_dis_kenar_y']
+    kutu = lambda p: kx0 < p[0] < kx1 and ky0 < p[1] < ky1
+    sari, beyaz, ksari, kbeyaz, sanal, say = [], [], [], [], [], collections.Counter()
+    r3 = lambda *v: [round(float(x), 3) for x in v]
+    for w, l in rol.items():
+        if not any(x[0] in tur for x in l):
+            continue
+        virt = H.WT[w].get('type') == 'virtual'
+        if virt:      # junction lanelet borders: the road direction for the third pass; an outer one (one lanelet) may still
+            P = H.P(w)[:, :2]   # have a RoadRunner gutter along it (curb past a side road), so it is an edge for the gutter pass
             for a, b in zip(P[:-1], P[1:]):
-                hedef += [round(float(a[0]), 3), round(float(a[1]), 3), round(float(b[0]), 3), round(float(b[1]), 3)]
-    print('  çizgi renkleri: bölge %.0f m2, %d sarı (düz) + %d beyaz (kesikli) çizgi parçası' % (bolge.area, len(sari) // 4, len(beyaz) // 4))
-    return dict(bolge_xy=[round(float(c), 2) for c in np.array(bolge.exterior.coords)[:, :2].ravel()], sari_xy=sari, beyaz_xy=beyaz)
+                sanal.extend(r3(a[0], a[1], b[0], b[1]))
+            if len(l) != 1:
+                continue
+        elif H.WT[w].get('type') not in ('line_thin', 'line_thick', 'road_border'):
+            continue
+        P = H.P(w)[:, :2]; roles = sorted(r for _, r in l)
+        if len(P) < 2:
+            continue
+        if roles == ['left', 'right']:
+            k = 'ayirici'
+        elif roles == ['left', 'left']:
+            k = 'orta'
+        elif len(l) == 1:
+            k = 'dis_kenar' if l[0][1] == 'right' else 'ic_kenar'; lid = l[0][0]
+        else:
+            continue
+        for a, b in zip(P[:-1], P[1:]):
+            mid = (a + b) / 2; d = b - a; n = np.hypot(*d)
+            if n < 1e-3:
+                continue
+            if k == 'ayirici':
+                s_ = False
+            elif k == 'orta':
+                s_ = kutu(mid)
+            else:
+                # turn the segment so that the road is on its left; for the right border that is the driving direction
+                if not poly[lid].contains(Point(mid + 0.4 * np.array([-d[1], d[0]]) / n)):
+                    a, b, d = b, a, -d
+                if k == 'dis_kenar':
+                    s_ = not (d[1] < 0 and REF.distance(Point(mid)) < Z['beyaz_dis_kenar_refuj_m'] and not (sy0 < mid[1] < sy1))
+                else:
+                    s_ = True
+                (ksari if s_ else kbeyaz).extend(r3(a[0], a[1], b[0], b[1]))
+            say[(k + ('_sanal' if virt else ''), 'sarı' if s_ else 'beyaz')] += 1
+            if not virt:      # nothing is painted on a virtual border
+                (sari if s_ else beyaz).extend(r3(a[0], a[1], b[0], b[1]))
+    # tour lanelet area, without the gate (own lanes / markings) and the west campus road (yellow centre)
+    gx0, gx1, gy0, gy1 = A['nizamiye']['awsim']['izgara'][:4]
+    ALAN = unary_union([poly[i] for i in tur]).buffer(0.05).buffer(-0.05).difference(SBox(gx0, gy0, gx1, gy1)).difference(SBox(kx0, ky0, kx1, ky1))
+    alan = [dict(xy=[round(float(v), 2) for q in np.array(r.coords)[:-1] for v in q])
+            for p in getattr(ALAN, 'geoms', [ALAN]) if p.area > 1 for r in [p.simplify(0.1).exterior, *p.simplify(0.1).interiors]]
+    S_ = np.array(sari + beyaz).reshape(-1, 2); x0, y0 = S_.min(0) - 3; x1, y1 = S_.max(0) + 3
+    print('  çizgi renkleri: tur üzerindeki %d şerit; parça: %s; oluk geçişi %d sarı / %d beyaz kenar parçası; tur alanı %d halka %.0f m²' % (
+        len(tur), ', '.join('%s %s %d' % (k, r, n) for (k, r), n in sorted(say.items())), len(ksari) // 4, len(kbeyaz) // 4, len(alan), ALAN.area))
+    return dict(bolge_xy=[round(float(v), 2) for v in (x0, y0, x1, y0, x1, y1, x0, y1)], sari_xy=sari, beyaz_xy=beyaz,
+                kenar_sari_xy=ksari, kenar_beyaz_xy=kbeyaz, sanal_xy=sanal, alan=alan, oluk_cizgi_m=float(Z['oluk_cizgi_m']))
 
 
 def nesne_verisi(A, H):
@@ -450,6 +519,13 @@ def calistir(A, hedef=None):
     renk = cizgi_renk_verisi(A, H, np.array(ref['sinir_xy']).reshape(-1, 2))
     print('awsim: nizamiye nesneleri')
     nes = nesne_verisi(A, H)
+    print('awsim: korkuluklar')
+    from . import korkuluk
+    kk = korkuluk.geometri(A, H)            # guardrails + concrete parapets along the tour route (veri/korkuluklar.json)
+    if kk:
+        nes = nes or {}
+        nes['korkuluklar'] = nes.get('korkuluklar', []) + kk['korkuluklar']
+        nes['duvarlar'] = nes.get('duvarlar', []) + kk['duvarlar']
     veri = dict(aciklama='Beytepe scene edits generated by tools/beytepe_duzenle (husmart-sim). ROS map frame.', nizamiye=niz, refuj=ref,
                 cizgi_renk=renk)
     if nes:
@@ -467,6 +543,18 @@ def calistir(A, hedef=None):
             ref['bulut_alanlari'].append(dict(xy=[round(float(c), 2) for q in np.array(g_.exterior.coords)[:-1] for c in q]))
         json_yaz(os.path.join(ara, 'bulut_alanlari.json'), ref['bulut_alanlari'])
         print('  bulut bölgesine nesne çevresi eklendi: %d çokgen, %.0f m2' % (len(ref['bulut_alanlari']) - n0, ek.area))
+    print('awsim: yol kenarı ağaçları')
+    from . import kenar
+    from shapely.geometry import Polygon, box
+    from shapely.ops import unary_union
+    adalar = unary_union([Polygon(np.array(ref['sinir_xy']).reshape(-1, 2)).buffer(0)] +
+                         [Polygon(np.array(e['xy']).reshape(-1, 2)).buffer(0) for e in ref['ek_sinirlar']])
+    kutu = box(niz['x0'], niz['y0'], niz['x0'] + niz['nx'] * niz['cozunurluk'], niz['y0'] + niz['ny'] * niz['cozunurluk'])
+    ken = kenar.geometri(A, H, adalar, kutu)
+    if ken:
+        veri['yol_kenari'] = ken
+        ref['bulut_alanlari'] += ken['gizle']     # trees replaced -> the map is regenerated from AWSIM in the whole corridor
+        json_yaz(os.path.join(ara, 'bulut_alanlari.json'), ref['bulut_alanlari'])
     hedef = hedef or yol(A['yollar']['awsim_veri'])
     json_yaz(hedef, veri, A if hedef == yol(A['yollar']['awsim_veri']) else None)
     print('awsim: %.1f MB -> %s' % (os.path.getsize(hedef) / 1e6, hedef))

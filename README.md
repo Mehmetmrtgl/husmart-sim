@@ -132,7 +132,7 @@ so the three always match. Settings (paths, lane width, curb size, lamp spacing,
 |---|---|---|
 | `cizim` | Google Earth drawing `tools/beytepe_duzenle/veri/nizamiye_cizim.kml` (vehicle routes = lane centres, asphalt areas, bus stop) | `uretilen/cizim_xy.json` (map frame; the imagery offset of 0.9 m / 1.25 m is corrected) |
 | `lanelet` | base map `harita/beytepe_yeni_v2/temel/lanelet2_map.osm` + drawing | `harita/beytepe_yeni_v2/lanelet2_map.osm` (17 gate lanes) |
-| `awsim` | lanelet map + drawing + `veri/refuj_nesneler.json`, `veri/refuj_guney_nesneler.json`, `veri/nizamiye_nesneler.json` | `~/awsim/AWSIM-src/Assets/Beytepe/Data/duzenlemeler.json` (read by `BeytepeDuzenleme.cs`) |
+| `awsim` | lanelet map + drawing + `veri/refuj_nesneler.json`, `veri/refuj_guney_nesneler.json`, `veri/nizamiye_nesneler.json`, `veri/korkuluklar.json`, `veri/yol_kenari_nesneler.json` | `~/awsim/AWSIM-src/Assets/Beytepe/Data/duzenlemeler.json` (read by `BeytepeDuzenleme.cs`) |
 | `kml` | lanelet map | `docs/ust_bakis/beytepe_sim.kml` and `uretilen/google_earth_hizali.kml` (sits on the Google Earth imagery) |
 | `bulut` | base cloud `temel/pointcloud_map.pcd` + AWSIM scene points | `pointcloud_map.pcd` and `harita/beytepe_yeni_v2_karolar/` |
 
@@ -145,14 +145,29 @@ What the scene gets from these files:
 - The main road median is one island from the campus junction (y ~300) to the gate U-turn (y ~2668): curbs, grass, the
   asphalt strip along the yellow edge line, two-arm lamps and trees measured in the real lidar map (`veri/refuj_*nesneler.json`).
 - `veri/nizamiye_nesneler.json` lists the permanent gate objects measured from the real lidar map and camera frames
-  (barriers with the arms up, flagpoles, booths, signs, banners, bins, the stone wall with its sidewalk, guardrails, wire fence).
+  (barriers with the arms up, flagpoles, booths, signs, banners, bins, the stone wall with its sidewalk, wire fence).
   `duzenle.py awsim` refuses objects that touch a lane. Temporary things (parked cars, cones) are deliberately left out.
+- `veri/korkuluklar.json` lists the guardrails and the white concrete parapet along the tour route: where each one starts and
+  ends was read in the real lidar map and camera frames; the line between follows the simulated road edge 1.3 m outside it.
+  Ends marked `gomulu` slope down into the ground as on the real road. In the scene a post never stands on a RoadRunner
+  sidewalk or curb (it moves outwards).
+- `veri/yol_kenari_nesneler.json` (step `kenar-tespit`) holds the trees within 22 m of the tour route, measured in the real
+  lidar map; they replace the RoadRunner trees there.
+- Lane markings on the tour roads get the real colours (RoadRunner has them the other way round): lane dividers and the
+  centre line of two-way roads white, road edges yellow; the exceptions seen in the camera frames (white outer edge of the
+  southbound main road, yellow centre line of the west campus road) are in `ayarlar.yaml` (`cizgiler`). The rules are applied
+  per line segment; yellow centre lines through junctions (virtual lanelet borders) become white. On the campus roads
+  RoadRunner has no painted edge line but a light concrete gutter strip along the curb: along the tour edges (also the
+  virtual outer borders of junction lanelets, where the curb runs past a side road) the gutter becomes asphalt and its
+  road-side 0.15 m (`oluk_cizgi_m`) the edge colour, as the yellow line by the curb in reality. Short gutter pieces on curves
+  and at crossings take their direction from the strip around them.
 - Every object and a 3 m margin around it is part of the point-cloud update region, so the map matches the scene.
 
-Three more steps need the real-vehicle recordings (not in the repo; paths in `ayarlar.yaml`):
+Four more steps need the real-vehicle recordings (not in the repo; paths in `ayarlar.yaml`):
 
     python3 tools/beytepe_duzenle/duzenle.py refuj-tespit                    # median lamps + trees from the real lidar map (north of y 1705)
     python3 tools/beytepe_duzenle/duzenle.py refuj-guney-tespit              # the same for the south part (y 300 .. 1705)
+    python3 tools/beytepe_duzenle/duzenle.py kenar-tespit                    # trees beside the tour route (real lidar map)
     python3 tools/beytepe_duzenle/duzenle.py kontrol 2560 2680 --yon kuzey   # draw the map onto real ZED camera frames
 
 `kontrol` writes `tools/beytepe_duzenle/uretilen/kontrol/kontrol_<y0>_<y1>_<yon>.jpg`: lane borders (yellow = gate lanes),

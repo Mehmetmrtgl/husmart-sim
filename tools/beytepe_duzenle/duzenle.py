@@ -14,6 +14,7 @@ Steps (in order):
 Needs the real-vehicle data (not in the repo):
   refuj-tespit  median lamps + trees from the real lidar map -> veri/refuj_nesneler.json
   refuj-guney-tespit  the same for the south part of the main road median -> veri/refuj_guney_nesneler.json
+  kenar-tespit  trees beside the tour route from the real lidar map -> veri/yol_kenari_nesneler.json
   kontrol Y0 Y1 [--yon kuzey|guney] [--adet N]   draw the map onto real ZED camera frames
 
 Every file that is overwritten is first copied to the backup folder (ayarlar.yaml: yollar.yedek).
@@ -23,7 +24,7 @@ import argparse, os, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bd import ortak  # noqa: E402
 
-ADIMLAR = ['cizim', 'lanelet', 'awsim', 'kml', 'hepsi', 'bulut', 'refuj-tespit', 'refuj-guney-tespit', 'kontrol']
+ADIMLAR = ['cizim', 'lanelet', 'awsim', 'kml', 'hepsi', 'bulut', 'refuj-tespit', 'refuj-guney-tespit', 'kenar-tespit', 'kontrol']
 
 
 def main():
@@ -60,6 +61,8 @@ def main():
             from bd import refuj; refuj.tespit_calistir(A)
         elif adim == 'refuj-guney-tespit':
             from bd import refuj; refuj.guney_tespit_calistir(A)
+        elif adim == 'kenar-tespit':
+            from bd import kenar; kenar.tespit_calistir(A)
         elif adim == 'kontrol':
             if len(a.y) != 2:
                 ap.error('kontrol: y0 y1 gerekli, örnek: duzenle.py kontrol 2580 2680 --yon kuzey')
