@@ -255,10 +255,28 @@ def nizamiye_verisi(A, H, Ho, plan, D):
     def kenar_uzaklik(p, Pp):
         a = Pp[:-1]; b = Pp[1:]; ab = b - a; t = np.clip(((p - a) * ab).sum(1) / np.maximum((ab * ab).sum(1), 1e-9), 0, 1)
         return np.min(np.hypot(*(a + t[:, None] * ab - p).T))
+    # The U-turn's outer edge line is not painted on its lane border but along the guardhouse island's curb, as on the real
+    # road (ZED frame 11925: the yellow line wraps round the island, the turning area itself has no line). Since the
+    # U-turn lane follows the real drive path, its outer border runs up to ~1.7 m in front of the island and a line there
+    # floated in the open asphalt. The line: 0.25 m in front of the island edge, where that edge is within 2.5 m of the border.
+    ur = SL(pts(H, plan['w']['Ur'])[:, :2]); ada_yolu = ADA.buffer(0.25).boundary.intersection(ur.buffer(2.5))
+    for g_ in getattr(ada_yolu, 'geoms', [ada_yolu]):
+        if g_.geom_type != 'LineString' or g_.length < 1.0:
+            continue
+        c_ = np.array(g_.coords); c_ = np.c_[c_, [zr(x_, y_) for x_, y_ in c_]]
+        cizgi_ciz(c_, False)
+        print('  U dönüşü dış çizgisi ada kenarında: %.1f m' % g_.length)
     nskip = 0
     for k, wid in plan['w'].items():
+        if k == 'Ur':
+            continue
         p = pts(H, wid); s = np.r_[0, np.cumsum(np.linalg.norm(np.diff(p[:, :2], axis=0), axis=1))]; ss = np.r_[np.arange(0, s[-1], 0.5), s[-1]]
         q = np.c_[[np.interp(ss, s, p[:, kk]) for kk in range(3)]].T; keep = np.ones(len(q), bool)
+        if k != 'Ul':       # the turning area is open (no lines), except the median-side line and the island line above
+            for kk in range(len(q)):
+                P_ = SPt(q[kk, 0], q[kk, 1])
+                if ur.distance(P_) < 2.5 and ADA.distance(P_) > 0.8:
+                    keep[kk] = False
         for ws, pa, Pp in lane_polys:
             if wid in ws:
                 continue
@@ -506,6 +524,11 @@ def calistir(A, hedef=None):
     np.savez(os.path.join(ara, 'nizamiye_izgara.npz'), **izgara)
     print('awsim: refüj')
     ref = refuj.geometri(A, H, plan)
+    from . import kenar
+    YOL = kenar.yol_alani(H); TK = A['yol_kenari']
+    ref['agaclar'], n_k, n_a = kenar.tac_kirp(ref['agaclar'], YOL, TK['tac_yol_payi_m'], TK['tac_en_az_m'])
+    print('  refüj ağaçları: %d tacı şeritten %.1f m geride kalacak şekilde küçültüldü, %d çok dar kaldığı için konmadı'
+          % (n_k, TK['tac_yol_payi_m'], n_a))
     for loop, g_ in ada_veri:     # gate islands share the median meshes (same curb / grass look)
         for vk, tk, Vs, Ts in [('kaldirim_v', 'kaldirim_t', g_['KV'], g_['KT']), ('cim_v', 'cim_t', g_['CV'], g_['CT']), ('bordur_v', 'bordur_t', g_['BV'], g_['BT'])]:
             o = len(ref[vk]) // 3
@@ -544,7 +567,6 @@ def calistir(A, hedef=None):
         json_yaz(os.path.join(ara, 'bulut_alanlari.json'), ref['bulut_alanlari'])
         print('  bulut bölgesine nesne çevresi eklendi: %d çokgen, %.0f m2' % (len(ref['bulut_alanlari']) - n0, ek.area))
     print('awsim: yol kenarı ağaçları')
-    from . import kenar
     from shapely.geometry import Polygon, box
     from shapely.ops import unary_union
     adalar = unary_union([Polygon(np.array(ref['sinir_xy']).reshape(-1, 2)).buffer(0)] +
@@ -552,8 +574,18 @@ def calistir(A, hedef=None):
     kutu = box(niz['x0'], niz['y0'], niz['x0'] + niz['nx'] * niz['cozunurluk'], niz['y0'] + niz['ny'] * niz['cozunurluk'])
     ken = kenar.geometri(A, H, adalar, kutu)
     if ken:
+        ken['agaclar'], n_k, n_a = kenar.tac_kirp(ken['agaclar'], YOL, TK['tac_yol_payi_m'], TK['tac_en_az_m'])
+        print('  yol kenarı: %d tacı şeritten %.1f m geride kalacak şekilde küçültüldü, %d çok dar kaldığı için konmadı'
+              % (n_k, TK['tac_yol_payi_m'], n_a))
         veri['yol_kenari'] = ken
         ref['bulut_alanlari'] += ken['gizle']     # trees replaced -> the map is regenerated from AWSIM in the whole corridor
+        json_yaz(os.path.join(ara, 'bulut_alanlari.json'), ref['bulut_alanlari'])
+    print('awsim: yol yüzeyi düzeltme')
+    from . import yol_duzelt
+    yd, yd_alan = yol_duzelt.veri(A)       # RoadRunner road steps / creases the real road does not have (ayarlar.yaml yol_duzelt)
+    if yd:
+        veri['yol_duzelt'] = yd
+        ref['bulut_alanlari'] += yd_alan     # the map is regenerated from AWSIM where the road surface changes
         json_yaz(os.path.join(ara, 'bulut_alanlari.json'), ref['bulut_alanlari'])
     hedef = hedef or yol(A['yollar']['awsim_veri'])
     json_yaz(hedef, veri, A if hedef == yol(A['yollar']['awsim_veri']) else None)

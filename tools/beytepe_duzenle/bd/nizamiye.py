@@ -92,6 +92,90 @@ def rel_xml(i, l, r, ad, hiz, notu):
             f'    <tag k="speed_limit" v="{hiz}" />\n    <tag k="note" v="{notu}: {ad}" />\n  </relation>\n')
 
 
+def gercek_ize_yasla(A, c, nn, gecis):
+    """Move the U-turn centre line c (normals nn) onto the real drive path along its normal: fully in the middle of the
+    turn, blended over `gecis` m at both ends so the ends stay on the connecting lanes."""
+    from scipy.spatial import cKDTree
+    from scipy.ndimage import uniform_filter1d
+    from .kenar import gercek_iz
+    R = gercek_iz(A, 0.25); R = R[R[:, 1] > c[:, 1].min() - 20.0]; t = cKDTree(R)
+    d, j = t.query(c); o = np.einsum('ij,ij->i', R[j] - c, nn); o[d > 6.0] = 0.0
+    o = uniform_filter1d(o, 7, mode='nearest')
+    s = np.r_[0, np.cumsum(np.hypot(*np.diff(c, axis=0).T))]
+    w = np.clip(np.minimum(s, s[-1] - s) / gecis, 0, 1); w = w * w * (3 - 2 * w)      # smoothstep
+    print('  U-turn centre -> real drive path: shift max %.2f m, mean %.2f m' % (np.abs(o * w).max(), np.abs(o * w).mean()))
+    return c + (o * w)[:, None] * nn
+
+
+def yaricap(c, yarim=2.0):
+    """Turn radius (m) at every point of polyline c: circle through the points yarim m behind and ahead (inf if straight)."""
+    s = np.r_[0, np.cumsum(np.hypot(*np.diff(c, axis=0).T))]
+    at = lambda u: np.c_[np.interp(np.clip(u, 0, s[-1]), s, c[:, 0]), np.interp(np.clip(u, 0, s[-1]), s, c[:, 1])]
+    p0, p1, p2 = at(s - yarim), at(s), at(s + yarim)
+    a = np.hypot(*(p1 - p2).T); b = np.hypot(*(p0 - p2).T); e = np.hypot(*(p0 - p1).T)
+    cr = np.abs((p1[:, 0] - p0[:, 0]) * (p2[:, 1] - p0[:, 1]) - (p1[:, 1] - p0[:, 1]) * (p2[:, 0] - p0[:, 0]))
+    return np.where(cr > 1e-9, a * b * e / (2 * np.maximum(cr, 1e-12)), np.inf)
+
+
+def gercek_donus(A, bas, bas_yon, bit, bit_yon, gecis, adim=0.7):
+    """U-turn centre line taken from the real drive path between the fork (bas, heading bas_yon) and the merge (bit,
+    heading bit_yon). The real path is moved onto the lane centres at both ends (the shift fades out over `gecis` m)
+    and lightly smoothed with the end points and directions fixed, so the lane turns where and as wide as the real
+    car did (tour 28: the drawn-route spline forced a straight start and end, squeezing the turn to R 3-4.5 m, which
+    the car could not follow and which folded the inner border back on itself)."""
+    from scipy.spatial import cKDTree
+    from .kenar import gercek_iz
+    G = gercek_iz(A, 0.25); t = cKDTree(G)
+    ia = int(t.query(bas)[1]); ib = int(t.query(bit)[1])
+    if not (ia < ib and t.query(bas)[0] < 1.5 and t.query(bit)[0] < 1.5 and ib - ia < 400):
+        raise SystemExit('HATA: gercek_donus: gerçek iz U dönüşünün uçlarından geçmiyor (%.2f m, %.2f m, %d nokta)'
+                         % (t.query(bas)[0], t.query(bit)[0], ib - ia))
+    g = G[ia:ib + 1]; s = np.r_[0, np.cumsum(np.hypot(*np.diff(g, axis=0).T))]
+    ss = np.linspace(0, s[-1], int(s[-1] / adim) + 1); g = np.c_[np.interp(ss, s, g[:, 0]), np.interp(ss, s, g[:, 1])]
+    # shift the ends onto the lane centres (smoothstep fade over gecis m)
+    wa = np.clip(1 - ss / gecis, 0, 1); wb = np.clip(1 - (ss[-1] - ss) / gecis, 0, 1)
+    wa, wb = wa * wa * (3 - 2 * wa), wb * wb * (3 - 2 * wb)
+    c = g + wa[:, None] * (bas - g[0]) + wb[:, None] * (bit - g[-1])
+    # fixed ends: first / last two points on the lane centres with the lane heading
+    c[0], c[-1] = bas, bit
+    c[1] = bas + adim * bas_yon / np.linalg.norm(bas_yon); c[-2] = bit - adim * bit_yon / np.linalg.norm(bit_yon)
+    # light smoothing of the interior (second-difference penalty), ends held
+    n = len(c); D = np.diff(np.eye(n), 2, axis=0); W = np.ones(n); W[:2] = W[-2:] = 1e6
+    c = np.linalg.solve(np.diag(W) + 2.0 * D.T @ D, W[:, None] * c)
+    r = yaricap(c)
+    print('  U-turn centre = real drive path: ends moved %.2f / %.2f m onto the lane centres, length %.1f m, '
+          'smallest radius %.1f m (real path %.1f m)' % (np.hypot(*(bas - g[0])), np.hypot(*(bit - g[-1])), ss[-1],
+                                                         r[2:-2].min(), yaricap(g)[2:-2].min()))
+    return c
+
+
+def kavsak_komsulari(H, tol):
+    """Pairs of parallel straight junction lanelets (a, b; b right of a) whose borders coincide but are separate ways:
+    (a, b, a's right way, b's left way). Only when both ways have the same end nodes and b's left way is used by b alone."""
+    LL = {lid: m for lid, (m, t) in H.R.items() if t.get('type') == 'lanelet' and 'left' in m and t.get('turn_direction') == 'straight'}
+    kullanan = {}
+    for lid, (m, t) in H.R.items():
+        for v in m.values():
+            kullanan.setdefault(v, set()).add(lid)
+
+    def samp(w, n=9):
+        P = np.array([H.N[i][:2] for i in H.W[w]]); s = np.r_[0, np.cumsum(np.hypot(*np.diff(P, axis=0).T))]; q = np.linspace(0, s[-1], n)
+        return np.c_[np.interp(q, s, P[:, 0]), np.interp(q, s, P[:, 1])]
+    bas = {}
+    for lid, m in LL.items():
+        bas.setdefault(H.W[m['left']][0], []).append(lid)
+    out = []
+    for a, ma in LL.items():
+        ra = ma['right']
+        for b in bas.get(H.W[ra][0], []):
+            lb = LL[b]['left']
+            if b == a or lb == ra or H.W[lb][-1] != H.W[ra][-1] or kullanan.get(lb) != {b}:
+                continue
+            if np.abs(samp(ra) - samp(lb)).max() <= tol:
+                out.append((a, b, ra, lb))
+    return out
+
+
 def set_way(metin, wid, nodes):
     pat = re.compile(r'(  <way id="%s">\n)((?:    <nd ref="\d+" />\n)+)' % wid)
     assert len(pat.findall(metin)) == 1, wid
@@ -172,6 +256,8 @@ def calistir(A, hedef=None):
     U = rota('donus')
     Y_N0, YB, YA, YTOP = Z['kuzey_baglanti_y'], Z['sag_catal_y'], float(U[0, 1]), Z['kuzey_uc_y']
     YS, YM, YP, YEND = Z['cep_catal_y'], float(U[-1, 1]), Z['cep_birlesme_y'], Z['guney_baglanti_y']
+    if Z.get('donus_gercek_iz_y'):      # U-turn fork / merge where the real car started / finished turning
+        YA, YM = map(float, Z['donus_gercek_iz_y'])
     n0, n1, n2 = Z['kuzey_baslangic_dugumleri']
 
     # ---- northbound (exit): a = up to the right fork, b = up to the U-turn, c = to the map edge
@@ -231,10 +317,25 @@ def calistir(A, hedef=None):
     R['G1d'] = U_.serit(w['SB0d'], w['SB1d'], 'giriş sol (bağlantı)'); R['G2d'] = U_.serit(w['SB1d'], w['SB2d'], 'giriş sağ (bağlantı)')
     R['CEP'] = U_.serit(w['Pl'], w['Pr'], 'durak cebi')
 
-    # ---- U-turn (exit -> entry): spline through the drawn route, leaves due north, arrives due south
-    u = U.copy(); s = np.r_[0, np.cumsum(np.hypot(*np.diff(u, axis=0).T))]
-    cs = CubicSpline(s, u, bc_type=((1, np.array([0, 1.0])), (1, np.array([0, -1.0]))))
-    ss = np.linspace(0, s[-1], int(s[-1] / 0.7) + 1); c = cs(ss); d = cs(ss, 1); d /= np.linalg.norm(d, axis=1)[:, None]; nn = np.c_[d[:, 1], -d[:, 0]]
+    # ---- U-turn (exit -> entry)
+    if Z.get('donus_gercek_iz_y'):
+        # centre line = real drive path from the left exit lane centre (heading north) to the left entry lane centre
+        # (heading south)
+        dy = 0.5
+        c = gercek_donus(A, np.array([cL(YA), YA]), np.array([cL(YA + dy) - cL(YA - dy), 2 * dy]),
+                         np.array([gL(YM), YM]), np.array([gL(YM - dy) - gL(YM + dy), -2 * dy]), Z['donus_gercek_iz_gecis_m'])
+        d = np.gradient(c, axis=0); d /= np.linalg.norm(d, axis=1)[:, None]; nn = np.c_[d[:, 1], -d[:, 0]]
+    else:
+        # spline through the drawn route, leaves due north, arrives due south
+        u = U.copy(); s = np.r_[0, np.cumsum(np.hypot(*np.diff(u, axis=0).T))]
+        cs = CubicSpline(s, u, bc_type=((1, np.array([0, 1.0])), (1, np.array([0, -1.0]))))
+        ss = np.linspace(0, s[-1], int(s[-1] / 0.7) + 1); c = cs(ss); d = cs(ss, 1); d /= np.linalg.norm(d, axis=1)[:, None]; nn = np.c_[d[:, 1], -d[:, 0]]
+        if Z.get('donus_gercek_iz_gecis_m', 0) > 0:
+            c = gercek_ize_yasla(A, c, nn, Z['donus_gercek_iz_gecis_m'])
+            d = np.gradient(c, axis=0); d /= np.linalg.norm(d, axis=1)[:, None]; nn = np.c_[d[:, 1], -d[:, 0]]
+    ri = yaricap(c - h * nn)
+    print('  U-turn inner border: smallest radius %.1f m, %s' % (ri[2:-2].min(), 'no fold' if np.all(np.einsum(
+        'ij,ij->i', np.diff(c - h * nn, axis=0), np.diff(c, axis=0)) > 0) else 'FOLDS BACK'))
     Ul = U_.sinir(c - h * nn, NB0b[-1], SB0b[-1], L=6.0); Ur = U_.sinir(c + h * nn, NB1b[-1], SB1b[-1], L=6.0)
     w['Ul'] = U_.yol(Ul, 'solid'); w['Ur'] = U_.yol(Ur, 'solid'); R['U'] = U_.serit(w['Ul'], w['Ur'], 'U dönüşü (ring dönüş)')
 
@@ -257,6 +358,46 @@ def calistir(A, hedef=None):
     out = out[:pos] + ''.join(way_xml(i, *v) for i, v in U_.yeni_yol.items()) + out[pos:]
     pos = out.rfind('</osm>')
     out = out[:pos] + ''.join(rel_xml(i, l, r, ad, Z['hiz_siniri'], Z['not']) for i, (l, r, ad) in U_.yeni_serit.items()) + out[pos:]
+
+    # ---- parallel straight junction lanelets share their border (b's own coincident left way is dropped)
+    ciftler = kavsak_komsulari(H, Z['kavsak_komsu_tolerans_m']) if Z.get('kavsak_komsu_tolerans_m', 0) > 0 else []
+    for a, b, ra, lb in ciftler:
+        rel = re.compile(r'(  <relation id="%s">\n(?:    [^\n]*\n)*?    <member type="way" ref=")%s(" role="left" />)' % (b, lb))
+        out, k = rel.subn(r'\g<1>%s\g<2>' % ra, out); assert k == 1, (b, lb)
+        out, k = re.subn(r'  <way id="%s">\n(?:    [^\n]*\n)*?  </way>\n' % lb, '', out); assert k == 1, lb
+        ic = set(H.W[lb][1:-1]) - {n for w_, ns in H.W.items() if w_ != lb for n in ns}
+        for i in ic:
+            out, k = re.subn(r'  <node id="%s" [^>]*(?:/>\n|>\n(?:    <tag [^\n]*\n)*  </node>\n)' % i, '', out); assert k == 1, i
+    if ciftler:
+        print('  junction neighbours: %d straight lanelet pairs now share their border: %s'
+              % (len(ciftler), ', '.join(f'{a}|{b}' for a, b, _, _ in ciftler)))
+
+    # ---- right of way at junctions (ayarlar: nizamiye.oncelik): without such a rule Autoware's intersection module
+    #      yields to every conflicting lane. A right_of_way regulatory element lists the tour lanelet (right_of_way) and
+    #      the lanes whose vehicles give way to it / never cross it (yield); all of them reference it.
+    oncelik = Z.get('oncelik') or []
+    yeni_id = max(int(i) for i in re.findall(r' id="(\d+)"', out)) + 1
+    for k, o in enumerate(oncelik):
+        rid = yeni_id + k; uyeler = [(l, 'right_of_way') for l in o['rota']] + [(l, 'yield') for l in o['yol_ver']]
+        for l, _ in uyeler:
+            blok = re.compile(r'(  <relation id="%s">\n(?:    <member [^\n]*\n)+)' % l)
+            out, n = blok.subn(r'\g<1>    <member type="relation" ref="%d" role="regulatory_element" />\n' % rid, out)
+            assert n == 1, (o['ad'], l)
+        pos = out.rfind('</osm>')
+        out = out[:pos] + (f'  <relation id="{rid}">\n' + ''.join(f'    <member type="relation" ref="{l}" role="{r}" />\n' for l, r in uyeler)
+                           + '    <tag k="type" v="regulatory_element" />\n    <tag k="subtype" v="right_of_way" />\n'
+                           + f'    <tag k="note" v="{o["ad"]}" />\n  </relation>\n') + out[pos:]
+    if oncelik:
+        print('  right of way: %s' % '; '.join('%s: %s > %s' % (o['ad'], o['rota'], o['yol_ver']) for o in oncelik))
+
+    # ---- lower speed limits (ayarlar: nizamiye.hiz_sinirlari): e.g. the K3 approach, where crossing traffic of unknown
+    #      priority was seen late and the intersection module braked at 4.45 m/s2 from 24 km/h (tour 32)
+    for h in Z.get('hiz_sinirlari') or []:
+        for l in h['lanelet']:
+            blok = re.compile(r'(  <relation id="%s">\n(?:    <[^\n]*\n)*?)    <tag k="speed_limit" v="[^"]*" />\n' % l)
+            out, n = blok.subn(r'\g<1>    <tag k="speed_limit" v="%s" />\n' % h['km_sa'], out)
+            assert n == 1, (h['ad'], l)
+        print('  speed limit %s km/h: %s %s' % (h['km_sa'], h['ad'], h['lanelet']))
 
     # ---- sanity check: every referenced node / way exists
     r2 = ET.fromstring(out.encode()); NN = {n.get('id') for n in r2.iter('node')}; WW = {x.get('id') for x in r2.iter('way')}

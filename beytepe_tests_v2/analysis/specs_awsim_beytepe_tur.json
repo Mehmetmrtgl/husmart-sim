@@ -1,13 +1,17 @@
 [
  {
   "name": "awsim_beytepe_03_tur",
-  "title": "AWSIM Beytepe: tam tur ~7.2 km (başlangıç -> 2000162 -> başlangıcın arkası 2000004) [hedef 2000004 frac 0.9: düz kısım; 0.5 virajdaydı (R~27 m)]",
+  "title": "AWSIM Beytepe: tam tur ~7.2 km (başlangıç -> 2000180 kuzeyden dönüş, birleşmeden 27 m önce -> 2000121 K11 sağ şerit -> başlangıcın arkası 2000004) [hedef 2000004 frac 0.9: düz kısım; 0.5 virajdaydı (R~27 m)]",
   "start": {
    "current": true
   },
   "waypoints": [
    {
-    "lanelet": 2000162,
+    "lanelet": 2000180,
+    "frac": 0.98
+   },
+   {
+    "lanelet": 2000121,
     "frac": 0.5
    }
   ],

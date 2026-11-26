@@ -42,8 +42,14 @@ units:
     type: diag
     node: localization_error_monitor
     name: ellipse_error_status
+    # Beytepe/Hüsmart (2026-11-25, user approved): at 50 km/h the EKF lateral ellipse runs at ~0.22 m and briefly crosses the
+    # 0.25 m default warn threshold for 0.02-0.06 s; each crossing caused a ~0.1 s emergency-stop MRM (tour 28: 5, tour 29: 3).
+    # A level change passes only after it has lasted more than 0.5 s, so any longer warning/error still triggers an MRM.
+    # Thresholds unchanged. The same WARN also comes from ekf_localizer (next unit), so both units get the same hysteresis.
+    hysteresis: 0.5
 
   - path: /autoware/localization/sensor_fusion_status
     type: diag
     node: localization
     name: ekf_localizer
+    hysteresis: 0.5  # see /autoware/localization/accuracy above

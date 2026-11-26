@@ -79,6 +79,16 @@ P = dict(
     lane_half_width=1.6, max_yaw_diff_deg=35.0,
     undertake_gap=5.0, undertake_gain=0.4,      # sağdan geçmeme hız sınırı: boşluk (m), kazanç (1/s)
     ego_front=3.79, ego_rear=1.1,  # base_link (arka aks) -> ön / arka uç (m)
+    # Unknown obstacles (tour 31): the object detector missed a stopped truck in the right lane until 12 m and the return
+    # after an overtake drove into it. Before a lane change the target lane is also checked in the obstacle point cloud
+    # (non-ground lidar points); a cluster there that no detected object explains blocks / cancels the lane change.
+    engel_menzil=130.0,          # point-cloud points used up to this distance (m)
+    engel_voksel=0.3,            # points are thinned to this grid (m)
+    engel_serit_yari=1.2,        # a point counts for the lane within this distance of its centre line (m)
+    engel_min_voksel=6,          # at least this many grid cells within 4 m along the lane = an obstacle
+    engel_geri=8.0,              # checked from this far behind the car ... (m)
+    engel_ileri_s=7.0, engel_ileri_min=40.0,    # ... to max(min, speed x this + 20 m) ahead
+    engel_obje_pay=1.5,          # points within half the object length + this of a detected object are explained by it (m)
 )
 MAP_ORIGIN = (39.87116440956932, 32.7356890084472)   # map_projector_info.yaml (Local; local_x/local_y kullanılır)
 VEHICLE_LABELS = (1, 2, 3, 4, 5)                     # CAR, TRUCK, BUS, TRAILER, MOTORCYCLE
@@ -301,6 +311,34 @@ def road_clear(lm, corr, s_from, dist, side="left"):
     return True, ""
 
 
+def bilinmeyen_engel(corr, pts, objs, s_from, s_to):
+    """Along-lane position of the nearest cluster of obstacle points (map x, y; non-ground lidar points) in the lane of
+    corridor corr between s_from and s_to that no detected object (dicts with x, y, L) explains; None if the lane is clear."""
+    import numpy as np
+    cp = np.asarray(corr.pts, dtype=float); cum = np.asarray(corr.cum[:len(cp)], dtype=float)
+    ss = np.arange(max(s_from, 0.0), min(s_to, corr.total), 0.5)
+    if len(ss) < 2 or len(pts) == 0:
+        return None
+    lx, ly = np.interp(ss, cum, cp[:, 0]), np.interp(ss, cum, cp[:, 1])
+    q = pts[(pts[:, 0] > lx.min() - 3) & (pts[:, 0] < lx.max() + 3) & (pts[:, 1] > ly.min() - 3) & (pts[:, 1] < ly.max() + 3)]
+    if len(q) == 0:
+        return None
+    d2 = (q[:, None, 0] - lx[None]) ** 2 + (q[:, None, 1] - ly[None]) ** 2
+    k = d2.argmin(1)
+    inl = np.sqrt(d2[np.arange(len(q)), k]) < P["engel_serit_yari"]
+    q, qs = q[inl], ss[k[inl]]
+    for o in objs:
+        if len(qs) == 0:
+            return None
+        far = np.hypot(q[:, 0] - o["x"], q[:, 1] - o["y"]) > o["L"] / 2 + P["engel_obje_pay"]
+        q, qs = q[far], qs[far]
+    qs = np.sort(qs); nmin = P["engel_min_voksel"]
+    for i in range(len(qs) - nmin + 1):
+        if qs[i + nmin - 1] - qs[i] <= 4.0:
+            return float(qs[i])
+    return None
+
+
 def junction_dist(lm, corr, s_from, dist):
     """s_from'dan dist kadar ileride ilk kavşak lanelet'inin (turn_direction etiketli) ya da koridor / rota sonunun
     uzaklığı (m); ikisi de yoksa None. Kavşağın içindeysek 0."""
@@ -469,6 +507,10 @@ def run_node():
             tl = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
             self.create_subscription(Odometry, "/localization/kinematic_state", self.on_odom, 1)
             self.create_subscription(PredictedObjects, "/perception/object_recognition/objects", self.on_objects, 1)
+            from sensor_msgs.msg import PointCloud2
+            from rclpy.qos import qos_profile_sensor_data
+            self.create_subscription(PointCloud2, "/perception/obstacle_segmentation/pointcloud", self.on_cloud, qos_profile_sensor_data)
+            self.engel, self.engel_log_t = None, -1e9
             self.create_subscription(LaneletRoute, "/planning/mission_planning/route", self.on_route, tl)
             self.create_subscription(OperationModeState, "/api/operation_mode/state", self.on_opmode, tl)
             self.create_subscription(RouteState, "/api/routing/state", self.on_route_state, tl)
@@ -482,7 +524,7 @@ def run_node():
             self.cli = self.create_client(SetPreferredLane, "/planning/mission_planning/manual_lane_change_handler/set_preferred_lane")
             self.SetPreferredLane, self.VelocityLimit, self.VelocityLimitClearCommand = SetPreferredLane, VelocityLimit, VelocityLimitClearCommand
             self.ego = None
-            self.objs = []
+            self.objs, self.all_objs = [], []
             self.route_ids, self.preferred_ids, self.goal_lanelet = set(), set(), None
             self.autonomous, self.route_state = False, 0
             self.state, self.t_state = "TAKIP", 0.0
@@ -511,9 +553,45 @@ def run_node():
             yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z))
             self.ego = (m.pose.pose.position.x, m.pose.pose.position.y, yaw, m.twist.twist.linear.x)
 
+        def on_cloud(self, m):
+            """Obstacle point cloud (base_link) -> thinned map-frame x, y of the points (see unknown_obstacle)."""
+            if self.ego is None or m.header.frame_id != "base_link":
+                return
+            import numpy as np
+            off = {f.name: f.offset for f in m.fields}
+            n = m.width * m.height
+            if n == 0 or not all(k in off for k in ("x", "y")):
+                self.engel = (self.now(), np.zeros((0, 2)))
+                return
+            buf = np.frombuffer(m.data, dtype=np.uint8, count=n * m.point_step).reshape(n, m.point_step)
+            xy = np.stack([buf[:, off[k]:off[k] + 4].copy().view("<f4").ravel() for k in ("x", "y")], 1).astype(float)
+            xy = xy[np.isfinite(xy).all(1) & (np.abs(xy[:, 0]) < P["engel_menzil"]) & (np.abs(xy[:, 1]) < 12.0)]
+            r = P["engel_voksel"]
+            xy = np.unique(np.round(xy / r).astype(np.int64), axis=0) * r if len(xy) else xy
+            ex, ey, yaw, _ = self.ego
+            c, sn = math.cos(yaw), math.sin(yaw)
+            self.engel = (self.now(), np.c_[ex + xy[:, 0] * c - xy[:, 1] * sn, ey + xy[:, 0] * sn + xy[:, 1] * c])
+
+        def unknown_obstacle(self, corr, s_from, s_to):
+            """bilinmeyen_engel() on the latest obstacle point cloud; None if the cloud is stale."""
+            if self.engel is None or self.now() - self.engel[0] > 1.0 or corr is None:
+                return None
+            return bilinmeyen_engel(corr, self.engel[1], self.all_objs, s_from, s_to)
+
+        def lane_blocked(self, corr, x, y, v, side_txt):
+            """unknown_obstacle over the lane-change check range; logs (at most every 2 s) and returns the distance or None."""
+            s0 = corr.project(x, y)[0]
+            u = self.unknown_obstacle(corr, s0 - P["engel_geri"], s0 + max(P["engel_ileri_min"], v * P["engel_ileri_s"] + 20.0))
+            if u is not None and self.now() - self.engel_log_t > 2.0:
+                self.engel_log_t = self.now()
+                self.get_logger().warn(f"{side_txt} şeritte {u - s0:.0f} m önde algılanmamış engel (nokta bulutu): şerit değiştirilmiyor")
+            return None if u is None else u - s0
+
         def on_objects(self, m):
-            objs = []
+            objs, alls = [], []
             for o in m.objects:
+                pz0 = o.kinematics.initial_pose_with_covariance.pose.position
+                alls.append(dict(x=pz0.x, y=pz0.y, L=max(o.shape.dimensions.x, o.shape.dimensions.y, 0.5)))
                 lab = o.classification[0].label if o.classification else 0
                 if lab not in VEHICLE_LABELS:
                     continue
@@ -523,7 +601,7 @@ def run_node():
                 tw = o.kinematics.initial_twist_with_covariance.twist.linear
                 objs.append(dict(x=pz.position.x, y=pz.position.y, yaw=yaw, v=math.hypot(tw.x, tw.y),
                                  L=max(o.shape.dimensions.x, 1.0), id=bytes(o.object_id.uuid)))
-            self.objs = objs
+            self.objs, self.all_objs = objs, alls
 
         def on_route(self, m):
             ids, pref = set(), set()
@@ -701,7 +779,10 @@ def run_node():
                     self.goto("TAKIP", "otonom değil / rota yok")
                 return
             self.sync_lane(t)
-            corr = self.lm.corridor(ego_ll, 80.0, 260.0, self.route_ids)
+            # corridor() measures `fwd` from the START of the lanelet; main-road lanelets are up to ~790 m long, so add the
+            # lanelet's own length: the corridor then reaches at least 260 m past the car wherever it is in the lanelet
+            # (before, 200 m before the end of a long lanelet the route looked like it ended -> needless move to the left)
+            corr = self.lm.corridor(ego_ll, 80.0, 260.0 + self.lm.length[ego_ll], self.route_ids)
             s_ego, _, _, _ = corr.project(x, y)
             v_des = min(P["v_cap"], self.lm.speed.get(ego_ll) or P["v_cap"])
             cobjs = self.lane_objects(corr, s_ego)
@@ -764,6 +845,20 @@ def run_node():
                 if in_left:
                     self.keep_right(t, x, y, v, v_des, Lc, Fo, robjs, ego_ll, right_id, orig_side)
                     return
+                # Keep right before Autoware moves left: we are already in the right lane (e.g. leaving K3 into the
+                # right lane) but the original route prefers the left one. Without this Autoware changed to the left
+                # lane for the route and "keep right" then changed back: a left + right pair with no car ahead that
+                # looked like an overtake (tours 29 and 30). The release below hands back to the route in time
+                # (keep_right_release), and an overtake can still start from the right lane.
+                if in_right and orig_side == "left" and self.desired == 2 and self.confirmed == 2 and not self.pending \
+                        and ego_ll != self.rejected_right_ll:
+                    need_r = P["keep_right_need"] + v * P["return_lookahead_s"]
+                    rc = self.lm.corridor(ego_ll, 0.0, need_r + 20.0 + self.lm.length[ego_ll], self.route_ids)
+                    if self.lane_in_route_ahead(rc, rc.project(x, y)[0], need_r):
+                        self.want_side("right", orig_side, "sağdan git: sağ şeritteyiz, rota sol şeridi tercih ediyor; sola geçme")
+                if in_right and self.desired == 1 and rejected:
+                    self.rejected_right_ll = ego_ll
+                    self.want_lane(2, "sağdan git: Autoware sağ kaydırmayı reddetti, asıl rotaya dön")
                 if in_right and self.desired == 1 and self.confirmed == 1 and not self.pending:
                     # "Sağdan git" kaydırması etkin (asıl rota sol şeridi tercih ediyordu). Rota ileride sol şeridi
                     # gerektiriyorsa ya da asıl tercih artık sağ şeritse kaydırmayı bırak: Autoware zamanında sola geçer.
@@ -784,6 +879,8 @@ def run_node():
                 if t < self.cooldown_until or self.pending or self.desired != self.confirmed:
                     return
                 why = self.can_overtake(corr=corr, s_ego=s_ego, v_des=v_des, lead=Lc, left_id=left_id, lobjs=lobjs, goal_dist=goal_dist)
+                if not why and self.lane_blocked(lcorr, x, y, v, "sol") is not None:
+                    why = "sol şeritte algılanmamış engel"
                 if why:
                     if t - self.last_log > 4.9:
                         self.get_logger().info(f"sollama yok: {why} ({self.fmt(r)})")
@@ -811,6 +908,8 @@ def run_node():
                     lcs_txt = (f"Autoware şerit değiştirme: {lcs[0]}, {'güvenli' if lcs[1] else 'hedef şerit GÜVENLİ DEĞİL'}"
                                if lcs else "Autoware şerit değiştirme adayı üretmedi")
                     reason = f"sola geçiş tamamlanmadı (zaman aşımı; {lcs_txt})"
+                elif not started and lcorr is not None and self.lane_blocked(lcorr, x, y, v, "sol") is not None:
+                    reason = "sol şeritte algılanmamış engel (nokta bulutu)"
                 elif not started and left_id is not None:
                     Lt, Fn, ov = split_lane(lobjs)
                     r = mobil(v, v_des, (Lc, Fo), (Lt, Fn), to_left=True)
@@ -839,7 +938,7 @@ def run_node():
                 # değişimi çatala kadar sürdü, araç rotada olmayan sağ çıkış şeridine girip takıldı.)
                 if orig_side == "left" and right_id is not None:
                     need_r = P["keep_right_need"] + v * P["return_lookahead_s"]
-                    rc = self.lm.corridor(right_id, 0.0, need_r + 20.0, self.route_ids)
+                    rc = self.lm.corridor(right_id, 0.0, need_r + 20.0 + self.lm.length[right_id], self.route_ids)
                     if not self.lane_in_route_ahead(rc, rc.project(x, y)[0], need_r):
                         self.want_lane(2, "sollama solda bitti: rota ileride sol şeridi gerektiriyor")
                         self.stats["completed"] += 1
@@ -895,6 +994,12 @@ def run_node():
                     return
                 if not (mobil_ok or timeout or not road_ok):
                     return
+                if rcorr is not None and self.lane_blocked(rcorr, x, y, v, "sağ") is not None:
+                    if mobil_ok and road_ok and not timeout:
+                        return                                    # stay left until the right lane is clear
+                    self.want_lane(2, "sağ şeritte algılanmamış engel; dönüş Autoware'e bırakıldı")
+                    self.goto("TAKIP", "sağ şeritte algılanmamış engel; yol / süre bitiyor, rota şeridine dönüldü")
+                    return
                 reason = ((f"ardışık sollamaya yol yetmiyor, öndeki yavaş aracın arkasına, {self.fmt(r)}" if chain_short
                            else f"geçilen araç arkada, {self.fmt(r)}") if mobil_ok else ("sol şeritte süre doldu" if timeout else why))
                 self.want_side("right", orig_side, reason)
@@ -916,10 +1021,22 @@ def run_node():
                     self.want_side("left", orig_side, "ardışık sollama")
                     self.goto("GECIS", f"ardışık sollama: dönüş iptal, sağ şeritte {c['gap_front']:.0f} m önde {c['v'] * 3.6:.0f} km/sa araç")
                     return
+                # Return not started yet and an unknown obstacle in the right lane: cancel it (stay left).
+                if in_left and rcorr is not None:
+                    lcs = self.lc_state("right")
+                    started = abs(corr.project(x, y)[1]) > 0.5 or (lcs is not None and lcs[0] == "YURUTULUYOR")
+                    if not started and self.lane_blocked(rcorr, x, y, v, "sağ") is not None:
+                        self.want_side("left", orig_side, "sağ şeritte algılanmamış engel: dönüş iptal")
+                        if self.return_kind == "sollama":
+                            self.goto("GECIS", "sağa dönüş iptal: sağ şeritte algılanmamış engel (nokta bulutu)")
+                        else:
+                            self.cooldown_until = t + P["cooldown_s"]
+                            self.goto("TAKIP", "sağdan git iptal: sağ şeritte algılanmamış engel (nokta bulutu)")
+                        return
                 # Dönüş henüz başlamadıysa ve rota keep_right_release içinde sol şeridi gerektiriyorsa dönüşten vazgeç
                 # (başlamış şerit değişimini kesmek planlamada ani kayma / MRM yapar: o zaman bitmesi beklenir).
                 if in_left and orig_side == "left" and right_id is not None:
-                    rc = self.lm.corridor(right_id, 0.0, P["keep_right_release"] + 20.0, self.route_ids)
+                    rc = self.lm.corridor(right_id, 0.0, P["keep_right_release"] + 20.0 + self.lm.length[right_id], self.route_ids)
                     lcs = self.lc_state("right")
                     started = abs(corr.project(x, y)[1]) > 0.5 or (lcs is not None and lcs[0] == "YURUTULUYOR")
                     if not started and not self.lane_in_route_ahead(rc, rc.project(x, y)[0], P["keep_right_release"]):
@@ -967,7 +1084,7 @@ def run_node():
             if self.ego is None or self.ego_ll is None:
                 return None
             x, y = self.ego[0], self.ego[1]
-            jc = self.lm.corridor(self.ego_ll, 0.0, dist + 40.0, self.route_ids)
+            jc = self.lm.corridor(self.ego_ll, 0.0, dist + 40.0 + self.lm.length[self.ego_ll], self.route_ids)
             s = jc.project(x, y)[0]
             return junction_dist(self.lm, jc, s, dist)
 
@@ -1010,12 +1127,15 @@ def run_node():
                 return
             if t < self.cooldown_until or self.pending or self.desired != self.confirmed:
                 return
-            rc = self.lm.corridor(right_id, 0.0, P["keep_right_need"] + 20.0, self.route_ids)
+            rc = self.lm.corridor(right_id, 0.0, P["keep_right_need"] + 20.0 + self.lm.length[right_id], self.route_ids)
             s_r = rc.project(x, y)[0]
             if not self.lane_in_route_ahead(rc, s_r, P["keep_right_need"]):
                 self.ok_since = None
                 return                                          # rota yakında sol şeridi gerektiriyor: solda kal
             lc_ok, _ = road_clear(self.lm, rc, s_r, P["lc_dist"] + 20.0, side="left")
+            if self.lane_blocked(rc, x, y, v, "sağ") is not None:
+                self.ok_since = None
+                return
             Lt, Fn, ov = split_lane(robjs)
             npl = Lc if (Lc is not None and Lc["v"] < v - 0.5) else None
             r = mobil(v, v_des, (Lc, Fo), (Lt, Fn), to_left=False, no_pass_lead=npl)

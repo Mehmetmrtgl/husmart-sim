@@ -13,6 +13,7 @@ yollar:
   refuj_guney_nesneler: tools/beytepe_duzenle/veri/refuj_guney_nesneler.json  # south median lamps + trees (output of "refuj-guney-tespit")
   nizamiye_nesneler: tools/beytepe_duzenle/veri/nizamiye_nesneler.json  # gate barriers, flags, wall, fence ... (measured by hand, input of "awsim")
   yol_kenari_nesneler: tools/beytepe_duzenle/veri/yol_kenari_nesneler.json  # trees along the tour route (output of "kenar-tespit", input of "awsim")
+  roadrunner_fbx: ~/awsim/AWSIM-src/Assets/Beytepe/Model/Beytepe.fbx   # RoadRunner world model (input of the road-surface repair)
   korkuluklar: tools/beytepe_duzenle/veri/korkuluklar.json         # guardrails + concrete parapets along the tour route (ends measured by hand, input of "awsim")
   awsim_veri: ~/awsim/AWSIM-src/Assets/Beytepe/Data/duzenlemeler.json   # AWSIM scene data (output)
   awsim_bulut: ~/awsim/beytepe_nizamiye_bulut.bin                # point cloud written by the AWSIM build (input of "bulut")
@@ -55,6 +56,32 @@ nizamiye:
   cep_giris_uzatma_m: 15.0      # bay entry curve is extended this far past the drawn corner
   hiz_siniri: 64
   not: "nizamiye 2026-11-13 (kullanıcı çizimi v2)"   # prefix of the "note" tag of the new lanes
+  # the drawn U-turn route lies up to ~2 m north of where the real car turned (tour 26: the car grazed the big booth's
+  # island and the median tip reached into the real path): its centre follows the real drive path, blended back onto
+  # the drawn route over this length at both ends (0: drawn route only)
+  donus_gercek_iz_gecis_m: 8.0
+  # U-turn fork (exit side) / merge (entry side) y: the real car started and finished turning ~5 m south of the drawn
+  # route's ends. With these set the U-turn lane starts / ends here and its centre IS the real drive path (ends moved
+  # onto the lane centres over donus_gercek_iz_gecis_m). Tour 28: the drawn-route spline forced straight ends and
+  # squeezed the turn to R 3-4.5 m (car 0.57 m off centre, inner border folded back). Remove to use the drawn route.
+  donus_gercek_iz_y: [2658.0, 2657.0]
+  # RoadRunner gives every junction lanelet its own virtual borders: parallel straight lanes through a junction do not
+  # share their border, so Autoware does not see them as neighbours and the route forces a lane change before every
+  # such junction (tour 26: y 888 / 1252 / 1622, campus y -266). Coincident borders (same end nodes) become shared.
+  kavsak_komsu_tolerans_m: 0.15   # 0: off
+  # Junctions on the tour where vehicles on the listed lanes really give way to the tour route or never cross it
+  # (confirmed by the user 2026-11-25). The map has no right_of_way rules, so Autoware's intersection module yielded to
+  # every conflicting lane (tour 28: long waits, a 3.45 m/s2 brake for a car going straight in the next lane).
+  # rota: the tour's junction lanelet; yol_ver: lanes that yield to it. Base-map lanelet ids.
+  oncelik:
+    - {ad: "K2 (-68, 197)", rota: [2000190], yol_ver: [2000101]}
+    # Return leg southbound: the tour goes straight on 2000211; traffic from the east (2000131 curve, 2000238) merges
+    # into the same lane and gives way (tour 29: a 74 s wait at the stop line here).
+    - {ad: "Merge (-205, 232)", rota: [2000211], yol_ver: [2000131, 2000238]}
+  # Lower speed limits (km/h) on listed lanelets. K3 approach (2026-11-26): crossing traffic from the south joins here and the
+  # real priority is unknown, so the car comes in slowly enough to stop gently (tour 32: 4.45 m/s2 from 24 km/h).
+  hiz_sinirlari:
+    - {ad: "K3 approach (-136, 224)", lanelet: [2000005, 2000239, 2000293], km_sa: 20}
   # existing map elements the new lanes connect to (ids in the base map)
   kuzey_baslangic_dugumleri: ["3722", "1014", "604"]   # north ends of the existing northbound borders (left, middle, right)
   guney_yollari: ["2000350", "2000316", "2000317"]     # existing southbound borders (left, middle, right), cut at guney_baglanti_y
@@ -107,6 +134,10 @@ yol_kenari:                     # trees along the tour route (kenar-tespit; real
   boy_max_m: 20.0               # taller tops are clipped (lidar ghosts above a crown)
   yol_payi_m: 0.5               # a trunk stays this far from every lane
   ada_payi_m: 0.5               # ... and from the median / gate islands (they have their own trees)
+  # every crown (roadside and median trees / bushes) stays this far from the lanes; the scene's crowns reach down to the
+  # ground, so an overhanging crown is an obstacle at roof height (tour 29: emergency brake at y 1957)
+  tac_yol_payi_m: 0.4
+  tac_en_az_m: 0.4              # a plant whose crown would get narrower than this is left out
 
 cizgiler:                       # lane marking colours on the tour roads, as in the real ZED frames (2026-11-23); RoadRunner has them the other way round
   # rules: lane divider (same direction) and the centre line of a two-way road -> white; road edge (also the median side) -> yellow
@@ -134,3 +165,15 @@ kamera:                         # ZED left camera of the real vehicle (for "kont
          [0.9999230638293274, -0.003779650812894386, 0.011814426008123111, -0.030043351177203036],
          [0, 0, 0, 1]]
   genislik: 960                 # the video is left|right side by side; the left half is used
+
+yol_duzelt:
+  # RoadRunner road-surface defects the real road does not have (2026-11-25). In every tour since the first one the AWSIM car
+  # jumped ~1 g at these places; the real drive recording (Xsens IMU, ~/harita_gercek/xsens_imu.npy) shows only noise there.
+  # Inside each circle the road surface becomes the smoothest surface that joins the unchanged surface around it (bd/yol_duzelt.py).
+  cozunurluk_m: 0.25       # grid cell
+  sinir_bant_m: 3.0        # band around the circle kept as it is (boundary condition of the fill)
+  kenar_sonum_m: 3.0       # off the road the height change fades out over this distance
+  bolgeler:
+    - {ad: "K3 exit", merkez: [-149.0, 242.6], yaricap_m: 6.0}       # 13 cm ramp over 0.4-0.8 m across both wheel tracks
+    - {ad: "return merge", merkez: [-211.3, 207.0], yaricap_m: 10.0}  # 35 cm pit at the west lane edge, 7 cm step under the right wheel track
+    - {ad: "K13", merkez: [-205.0, -275.0], yaricap_m: 8.0}          # 10 % grade breaks inside the junction

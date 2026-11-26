@@ -183,11 +183,12 @@ def halka(xy, z_fn=None, z=None, adim=0.5):
     return np.c_[out, zz]
 
 
-def kaldirimli_ada(loop, KG, KH, TUM, pay=0.0):
+def kaldirimli_ada(loop, KG, KH, TUM, pay=0.0, asfalt_maske=None):
     """Raised island inside a ring at the road edge (loop: x, y, road height; resampled ~0.5 m):
     a curb strip KG wide and KH high, grass inside (meets the curb tops, +TUM mound 1.5 m away from the curbs),
     a vertical curb face. With pay > 0 the curb stands pay m inside the ring and the strip in between
-    (from 8 cm, so the edge line stays visible) is asphalt at road height."""
+    (from 8 cm, so the edge line stays visible) is asphalt at road height - only inside asfalt_maske when given
+    (along the lanes; around the median nose there is no road, the strip lay on the grass as grey shelves)."""
     from shapely.geometry import Polygon
     dis = Polygon(loop[:, :2]).buffer(0)
     t0 = cKDTree(loop[:, :2]); n0 = len(loop)
@@ -222,7 +223,10 @@ def kaldirimli_ada(loop, KG, KH, TUM, pay=0.0):
     if not inner.is_empty:
         ucgenle(inner, CV, CT, zcim)
     if pay > 0:
-        ucgenle(dis.buffer(-0.08, join_style=2).difference(poly), SV, ST, lambda x, y: zyol(x, y) + 0.005)
+        serit = dis.buffer(-0.08, join_style=2).difference(poly)
+        if asfalt_maske is not None:
+            serit = serit.intersection(asfalt_maske)
+        ucgenle(serit, SV, ST, lambda x, y: zyol(x, y) + 0.005)
     for k in range(nl):                                           # curb face: vertical strip along the curb edge
         a = kenar[k]; b = kenar[(k + 1) % nl]; i0 = len(BV)
         BV += [[a[0], a[1], a[2] - 0.05], [a[0], a[1], a[2] + KH], [b[0], b[1], b[2] - 0.05], [b[0], b[1], b[2] + KH]]
@@ -250,6 +254,25 @@ def geometri(A, H, plan, nesneler=None):
     # the road height along the ring, smoothed over ~5 m (lanelet node heights are a few cm noisy: the curbs looked wavy)
     from scipy.ndimage import uniform_filter1d
     loop[:, 2] = uniform_filter1d(loop[:, 2], 11, mode='wrap')
+    # the south nose is not at a road: between the two carriageways RoadRunner's grass bulges up to ~0.3 m above the
+    # straight line between their heights, and stood over the curb there (2026-11-24). Its ring follows the ground of the
+    # base cloud (30th percentile within 0.6 m), never lower than before.
+    ara = yol(A['yollar']['ara']); B_ = pcd_oku(yol(A['yollar']['temel_bulut']), onbellek=os.path.join(ara, 'temel_bulut.npy'))[:, :3]
+    lo_, hi_ = nose[:, :2].min(0) - 3, nose[:, :2].max(0) + 3
+    B_ = B_[(B_[:, 0] > lo_[0]) & (B_[:, 0] < hi_[0]) & (B_[:, 1] > lo_[1]) & (B_[:, 1] < hi_[1])]
+    if len(B_):
+        tb_, tn_ = cKDTree(B_[:, :2]), cKDTree(nose[:, :2])
+        burun = np.flatnonzero(tn_.query(loop[:, :2])[0] < 0.6); n_up = 0
+        for i in burun:
+            dis_ = loop[i, :2] - c0; dis_ /= max(np.hypot(*dis_), 1e-6)      # outward (away from the nose centre)
+            zs_ = []
+            for off in (0.0, 0.5):                                          # on the ring and 0.5 m outside it
+                ii = tb_.query_ball_point(loop[i, :2] + off * dis_, 0.5)
+                if len(ii) >= 3:
+                    zs_.append(float(np.percentile(B_[ii, 2], 30)))
+            if zs_ and max(zs_) - 0.02 > loop[i, 2]:
+                loop[i, 2] = max(zs_) - 0.02; n_up += 1
+        print('  güney burnu: %d / %d halka noktası zemine kaldırıldı' % (n_up, len(burun)))
     # cut the median where a crosswalk crosses it (the real median is open there); every piece is its own island
     tl0 = cKDTree(loop[:, :2]); n0 = len(loop)
 
@@ -275,9 +298,12 @@ def geometri(A, H, plan, nesneler=None):
         else:
             print('  refüj %d yaya geçidinde açıldı -> %d parça' % (len(gecit), len(parcalar)))
     adalar = []
+    from shapely.geometry import LineString
+    pay_ = Rf.get('kenar_payi_m', 0.0)
+    maske = unary_union([LineString(b[:, :2]).buffer(pay_ + 0.2, cap_style=2) for b in (east, west, uin) if len(b) > 1])
     for q in parcalar:
         lp = loop if q is dis0 else halka(np.array(q.exterior.coords), z_fn=zring)
-        adalar.append((lp, kaldirimli_ada(lp, KG, KH, TUM, Rf.get('kenar_payi_m', 0.0))))
+        adalar.append((lp, kaldirimli_ada(lp, KG, KH, TUM, pay_, maske)))
     loop, g = adalar[0]
     poly = unary_union([g_['dis'] for _, g_ in adalar]); ta = cKDTree(ax)
 

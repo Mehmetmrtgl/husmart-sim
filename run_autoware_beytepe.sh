@@ -30,6 +30,14 @@ done
 [ -d "$AUTOWARE_DATA" ] || echo "UYARI: $AUTOWARE_DATA yok; algılama modelleri (centerpoint, yolox) yüklenemez. README 'Kurulum'."
 if ! pgrep -f "AWSIM-Beytepe.x86_64" >/dev/null; then echo "UYARI: AWSIM çalışmıyor görünüyor (önce ./run_awsim.sh)."; fi
 
+# RViz runs as root inside the container: let root (only root) use this X display. The grant is lost when the X server
+# restarts, and without it RViz silently fails to open.
+if command -v xhost >/dev/null; then
+  DISPLAY="${DISPLAY:-:0}" xhost +SI:localuser:root >/dev/null 2>&1 || echo "UYARI: ${DISPLAY:-:0} ekranına izin verilemedi; RViz açılmayabilir."
+else
+  echo "UYARI: xhost yok; RViz ekrana bağlanamayabilir (sudo apt install x11-xserver-utils)."
+fi
+
 docker rm -f autoware_e2e >/dev/null 2>&1 || true
 docker run -d --name autoware_e2e --net host --ipc host --gpus all \
   -e DISPLAY="${DISPLAY:-:0}" -e QT_X11_NO_MITSHM=1 -e ROS_DOMAIN_ID="$ROS_DOMAIN_ID" \
@@ -39,6 +47,8 @@ docker run -d --name autoware_e2e --net host --ipc host --gpus all \
   -v "$DIR/planning_common/common.param.yaml":$CFG/planning/scenario_planning/common/common.param.yaml:ro \
   -v "$DIR/planning_preset/default_preset.yaml":$CFG/planning/preset/default_preset.yaml:ro \
   -v "$DIR/planning_crosswalk/crosswalk.param.yaml":$CFG/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/crosswalk.param.yaml:ro \
+  -v "$DIR/planning_intersection/intersection.param.yaml":$CFG/planning/scenario_planning/lane_driving/behavior_planning/behavior_velocity_planner/intersection.param.yaml:ro \
+  -v "$DIR/perception_centerpoint/centerpoint_tiny_ml_package.param.yaml":/root/autoware_data/lidar_centerpoint/centerpoint_tiny_ml_package.param.yaml:ro \
   -v "$DIR/husmart_sensor_kit":/opt/husmart:ro \
   -v "$DIR/husmart_sensor_kit/override/tier4_localization_component.launch.xml":/opt/autoware/share/autoware_launch/launch/components/tier4_localization_component.launch.xml:ro \
   -v /tmp/.X11-unix:/tmp/.X11-unix:rw \

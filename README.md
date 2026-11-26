@@ -131,7 +131,7 @@ so the three always match. Settings (paths, lane width, curb size, lamp spacing,
 | Step | Input | Output |
 |---|---|---|
 | `cizim` | Google Earth drawing `tools/beytepe_duzenle/veri/nizamiye_cizim.kml` (vehicle routes = lane centres, asphalt areas, bus stop) | `uretilen/cizim_xy.json` (map frame; the imagery offset of 0.9 m / 1.25 m is corrected) |
-| `lanelet` | base map `harita/beytepe_yeni_v2/temel/lanelet2_map.osm` + drawing | `harita/beytepe_yeni_v2/lanelet2_map.osm` (17 gate lanes) |
+| `lanelet` | base map `harita/beytepe_yeni_v2/temel/lanelet2_map.osm` + drawing + real drive path | `harita/beytepe_yeni_v2/lanelet2_map.osm` (17 gate lanes; the U-turn lane forks / merges where the real car started / finished turning and its centre is the real drive path, smallest radius ~6 m; parallel straight junction lanelets share their coincident virtual border, so Autoware sees them as neighbours and the route does not force a lane change before every junction; `right_of_way` rules at the junctions listed in `ayarlar.yaml` `nizamiye.oncelik`, where the lanes that really give way to the tour route are not waited for) |
 | `awsim` | lanelet map + drawing + `veri/refuj_nesneler.json`, `veri/refuj_guney_nesneler.json`, `veri/nizamiye_nesneler.json`, `veri/korkuluklar.json`, `veri/yol_kenari_nesneler.json` | `~/awsim/AWSIM-src/Assets/Beytepe/Data/duzenlemeler.json` (read by `BeytepeDuzenleme.cs`) |
 | `kml` | lanelet map | `docs/ust_bakis/beytepe_sim.kml` and `uretilen/google_earth_hizali.kml` (sits on the Google Earth imagery) |
 | `bulut` | base cloud `temel/pointcloud_map.pcd` + AWSIM scene points | `pointcloud_map.pcd` and `harita/beytepe_yeni_v2_karolar/` |
@@ -143,7 +143,10 @@ The base map and base cloud (`harita/beytepe_yeni_v2/temel/`) are the state befo
 What the scene gets from these files:
 
 - The main road median is one island from the campus junction (y ~300) to the gate U-turn (y ~2668): curbs, grass, the
-  asphalt strip along the yellow edge line, two-arm lamps and trees measured in the real lidar map (`veri/refuj_*nesneler.json`).
+  asphalt strip along the yellow edge line (only along the lanes, not around the noses), two-arm lamps and trees measured
+  in the real lidar map (`veri/refuj_*nesneler.json`). The RoadRunner ground under the raised curb / grass is sunk so it
+  does not poke through; the road under the asphalt strip is left as it is. The south nose (y ~298) is not at a road:
+  its ring follows the ground of the base cloud there (RoadRunner's grass bulges between the two carriageways).
 - `veri/nizamiye_nesneler.json` lists the permanent gate objects measured from the real lidar map and camera frames
   (barriers with the arms up, flagpoles, booths, signs, banners, bins, the stone wall with its sidewalk, wire fence).
   `duzenle.py awsim` refuses objects that touch a lane. Temporary things (parked cars, cones) are deliberately left out.
@@ -152,7 +155,14 @@ What the scene gets from these files:
   Ends marked `gomulu` slope down into the ground as on the real road. In the scene a post never stands on a RoadRunner
   sidewalk or curb (it moves outwards).
 - `veri/yol_kenari_nesneler.json` (step `kenar-tespit`) holds the trees within 22 m of the tour route, measured in the real
-  lidar map; they replace the RoadRunner trees there.
+  lidar map; they replace the RoadRunner trees there. Every crown (roadside and median) is cut to stay 0.4 m off the lanes
+  (`yol_kenari.tac_yol_payi_m`): the scene's crowns reach down to the ground, so an overhanging crown is an obstacle at roof
+  height for the emergency brake.
+- Road-surface repair (`yol_duzelt`, `bd/yol_duzelt.py`): the RoadRunner road mesh has a 13 cm ramp at the K3 exit, a 35 cm
+  pit / 7 cm step at the return-leg merge and 10 % grade breaks inside K13; the simulated car jumped about 1 g there in every
+  tour, while the real drive recording (IMU) shows nothing. Inside each circle the road surface is smoothed (thin-plate
+  smoothing spline, surface around the circle unchanged) from `Beytepe.fbx`; the scene builder puts the road vertices on it
+  and moves the other layers (markings, gutters, curbs, grass) by the same height change.
 - Lane markings on the tour roads get the real colours (RoadRunner has them the other way round): lane dividers and the
   centre line of two-way roads white, road edges yellow; the exceptions seen in the camera frames (white outer edge of the
   southbound main road, yellow centre line of the west campus road) are in `ayarlar.yaml` (`cizgiler`). The rules are applied
@@ -182,8 +192,9 @@ median lamps (magenta) and trees (green) drawn on the real camera images; if the
 | `awsim_ayar/beytepe-config-husmart.json` | AWSIM settings: sensor layout (`SensorRig`), NPC count, NPCs yielding to the ego (`NpcEgo`), sky. No rebuild needed; restart AWSIM. |
 | `husmart_sensor_kit/` | Autoware sensor kit (lidar preprocessing, IMU, calibration). Details: [README](husmart_sensor_kit/README.md) |
 | `diag_graph/` | Autoware diagnostic graph (MRM triggers); changes listed in `README.txt` |
-| `planning_common/`, `planning_preset/`, `planning_crosswalk/` | Planning parameters (50 km/h limit, yielding to pedestrians at crosswalks) |
-| `overtake/overtake_manager.py` | Overtake manager (MOBIL + IDM, keep-right rules) |
+| `planning_common/`, `planning_preset/`, `planning_crosswalk/`, `planning_intersection/` | Planning parameters (50 km/h limit, yielding to pedestrians at crosswalks, smaller time gap to crossing traffic at junctions without priority: 3 s before / 2 s after instead of 4 s / 3 s) |
+| `perception_centerpoint/` | Lidar object detector (CenterPoint tiny): pillar limit 120000 instead of 40000. With 9 lidars and dense trees the limit was exceeded in about half of the frames on the main road and the dropped pillars hid vehicles (tour 31: a stopped truck seen only 12 m ahead). Autoware rebuilds the TensorRT encoder engine in `~/autoware_data` when the limit changes |
+| `overtake/overtake_manager.py` | Overtake manager (MOBIL + IDM, keep-right rules). Before every lane change it also checks the target lane in the obstacle point cloud: a cluster of non-ground lidar points that no detected object explains blocks or cancels the lane change, so a missed detection cannot send the car into a stopped vehicle |
 | `harita/beytepe_yeni_v2/` | Lanelet2 map (generated from RoadRunner, corrected by hand) and projector settings |
 | `roadrunner/` | RoadRunner sources (`.rrscene`, `.xodr`, `.geojson`), the first Autoware maps, conversion notes |
 | `beytepe_tests_v2/` | Tour scenarios (`analysis/specs_*.json`), tour runner, analysis scripts, older test reports |

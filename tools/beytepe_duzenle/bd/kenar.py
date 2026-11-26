@@ -97,6 +97,23 @@ def tespit_calistir(A, hedef=None):
     return veri
 
 
+def tac_kirp(agaclar, yol_alan, pay, en_az):
+    """Keep every crown off the lanes (tour 29: a roadside bush's crown reached 1 m into the lane at roof height and
+    triggered the emergency brake). The crown radius `tac` is cut to (trunk-to-lane distance - pay); a plant whose crown
+    would get narrower than `en_az` is left out. Cut plants get kirp=True (the scene builder then does not widen them)."""
+    from shapely.geometry import Point
+    from shapely.prepared import prep
+    out, n_k, n_a = [], 0, 0
+    for t in agaclar:
+        izin = yol_alan.distance(Point(t['x'], t['y'])) - pay
+        if izin < en_az:
+            n_a += 1; continue
+        if t['tac'] > izin:
+            t = dict(t, tac=round(float(izin), 2), kirp=True); n_k += 1
+        out.append(t)
+    return out, n_k, n_a
+
+
 def geometri(A, H, adalar, kutu):
     """Scene data: trees off the lanes, the islands (`adalar`, shapely) and the gate box (`kutu`), corridor pieces."""
     from shapely.geometry import Point, LineString, Polygon
