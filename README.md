@@ -142,11 +142,13 @@ The base map and base cloud (`harita/beytepe_yeni_v2/temel/`) are the state befo
 
 What the scene gets from these files:
 
-- The main road median is one island from the campus junction (y ~300) to the gate U-turn (y ~2668): curbs, grass, the
+- The main road median is one island from the campus junction ring (y ~234) to the gate U-turn (y ~2668): curbs, grass, the
   asphalt strip along the yellow edge line (only along the lanes, not around the noses), two-arm lamps and trees measured
   in the real lidar map (`veri/refuj_*nesneler.json`). The RoadRunner ground under the raised curb / grass is sunk so it
-  does not poke through; the road under the asphalt strip is left as it is. The south nose (y ~298) is not at a road:
-  its ring follows the ground of the base cloud there (RoadRunner's grass bulges between the two carriageways).
+  does not poke through; the road under the asphalt strip is left as it is. South of y ~300 the two carriageways part and
+  the median goes on as a widening wedge down to the junction ring (`refuj.guney_kama` in `ayarlar.yaml`: the lane-free
+  area between the lanes, cut where the lane-free gore between the K3 junction lanes is road); its trees are the measured
+  roadside ones.
 - `veri/nizamiye_nesneler.json` lists the permanent gate objects measured from the real lidar map and camera frames
   (barriers with the arms up, flagpoles, booths, signs, banners, bins, the stone wall with its sidewalk, wire fence).
   `duzenle.py awsim` refuses objects that touch a lane. Temporary things (parked cars, cones) are deliberately left out.

@@ -183,6 +183,58 @@ def halka(xy, z_fn=None, z=None, adim=0.5):
     return np.c_[out, zz]
 
 
+def kama_ekle(loop, K, H):
+    """South of the nose the two carriageways part and the median goes on as a widening wedge down to the campus junction
+    ring (curbs on both sides in the real ZED frames; user 2026-11-26: "kaldırımı refüj boyunca ilerlet").
+    The wedge is the lane-free area inside K['kutu'] (x0 x1 y0 y1) that holds K['tohum']; it is joined to the ring.
+    Height of the new outline: the old ring north of the box, inside it the nearest lane border (smoothed like the ring).
+    Returns the new ring (x, y, z every 0.5 m), the lane borders in the box (asphalt strip mask) and the wedge polygon."""
+    from shapely.geometry import Polygon, Point, box
+    from shapely.ops import unary_union
+    from scipy.ndimage import uniform_filter1d
+    x0, x1, y0, y1 = K['kutu']; kutu = box(x0, y0, x1, y1); seritler, kenar_ = [], []
+    for lid, (mm, t) in H.R.items():
+        if t.get('type') != 'lanelet' or t.get('subtype', 'road') != 'road' or 'left' not in mm:
+            continue
+        L, R = H.P(mm['left']), H.P(mm['right'])
+        if np.dot(L[-1, :2] - L[0, :2], R[-1, :2] - R[0, :2]) < 0:
+            R = R[::-1]
+        pg = Polygon(np.r_[L[:, :2], R[::-1, :2]]).buffer(0)
+        if pg.intersects(kutu):
+            seritler.append(pg); kenar_ += [L, R]
+    bos = kutu.difference(unary_union(seritler))
+    kama = [g for g in getattr(bos, 'geoms', [bos]) if g.geom_type == 'Polygon' and g.contains(Point(K['tohum']))]
+    if not kama:
+        raise SystemExit('HATA: refuj.guney_kama: tohum %s şeritlerin arasındaki boş alanda değil' % (K['tohum'],))
+    kama = kama[0]
+    for xa, ya, xb, yb in K.get('kes', []):    # cut lines (lane-free road between diverging junction lanes): the seed side stays
+        d = np.array([xb - xa, yb - ya]) / np.hypot(xb - xa, yb - ya); n = np.array([-d[1], d[0]]); p = np.array([xa, ya])
+        n = n if np.dot(n, np.array(K['tohum']) - p) > 0 else -n
+        yari = Polygon([p - 1e3 * d, p + 1e3 * d, p + 1e3 * d + 1e3 * n, p - 1e3 * d + 1e3 * n])
+        kama = kama.intersection(yari)
+        kama = [g for g in getattr(kama, 'geoms', [kama]) if g.geom_type == 'Polygon' and g.contains(Point(K['tohum']))][0]
+    kama = kama.buffer(-0.3, join_style=2).buffer(0.3, join_style=2)          # slivers between merging lanes are dropped
+    if kama.geom_type != 'Polygon':
+        kama = max(kama.geoms, key=lambda g: g.area)
+    eski = Polygon(loop[:, :2]).buffer(0)
+    if not kama.intersects(eski):
+        raise SystemExit('HATA: refuj.guney_kama: kama refüjün güney ucuna değmiyor (kutu y1 refüjün içine girmeli)')
+    yeni = unary_union([eski, kama]).buffer(0.05, join_style=2).buffer(-0.05, join_style=2)
+    if yeni.geom_type != 'Polygon':
+        yeni = max(yeni.geoms, key=lambda g: g.area)
+
+    def sik(P, adim=0.5):        # polyline points every adim m (lane borders can have nodes several metres apart)
+        s = np.r_[0, np.cumsum(np.hypot(*np.diff(P[:, :2], axis=0).T))]; ss = np.r_[np.arange(0, s[-1], adim), s[-1]]
+        return np.c_[[np.interp(ss, s, P[:, k]) for k in range(3)]].T
+    B = np.concatenate([sik(b) for b in kenar_]); tb = cKDTree(B[:, :2]); tl = cKDTree(loop[:, :2])
+    lp = halka(np.array(yeni.exterior.coords), z_fn=lambda x, y: 0.0)
+    zb = uniform_filter1d(B[tb.query(lp[:, :2])[1], 2], 11, mode='wrap')
+    disarda = ~((lp[:, 0] > x0) & (lp[:, 0] < x1) & (lp[:, 1] > y0) & (lp[:, 1] < y1))
+    lp[:, 2] = np.where(disarda, loop[tl.query(lp[:, :2])[1], 2], zb)
+    print('  güney kaması: +%.0f m2 (refüj y %.0f yerine %.0f den başlıyor)' % (yeni.area - eski.area, eski.bounds[1], yeni.bounds[1]))
+    return lp, kenar_, kama
+
+
 def kaldirimli_ada(loop, KG, KH, TUM, pay=0.0, asfalt_maske=None):
     """Raised island inside a ring at the road edge (loop: x, y, road height; resampled ~0.5 m):
     a curb strip KG wide and KH high, grass inside (meets the curb tops, +TUM mound 1.5 m away from the curbs),
@@ -273,6 +325,9 @@ def geometri(A, H, plan, nesneler=None):
             if zs_ and max(zs_) - 0.02 > loop[i, 2]:
                 loop[i, 2] = max(zs_) - 0.02; n_up += 1
         print('  güney burnu: %d / %d halka noktası zemine kaldırıldı' % (n_up, len(burun)))
+    kama_kenar, kama = [], None
+    if Rf.get('guney_kama'):         # the median goes on south of the nose as a wedge down to the junction ring
+        loop, kama_kenar, kama = kama_ekle(loop, Rf['guney_kama'], H)
     # cut the median where a crosswalk crosses it (the real median is open there); every piece is its own island
     tl0 = cKDTree(loop[:, :2]); n0 = len(loop)
 
@@ -300,7 +355,7 @@ def geometri(A, H, plan, nesneler=None):
     adalar = []
     from shapely.geometry import LineString
     pay_ = Rf.get('kenar_payi_m', 0.0)
-    maske = unary_union([LineString(b[:, :2]).buffer(pay_ + 0.2, cap_style=2) for b in (east, west, uin) if len(b) > 1])
+    maske = unary_union([LineString(b[:, :2]).buffer(pay_ + 0.2, cap_style=2) for b in (east, west, uin, *kama_kenar) if len(b) > 1])
     for q in parcalar:
         lp = loop if q is dis0 else halka(np.array(q.exterior.coords), z_fn=zring)
         adalar.append((lp, kaldirimli_ada(lp, KG, KH, TUM, pay_, maske)))
@@ -317,6 +372,15 @@ def geometri(A, H, plan, nesneler=None):
     pg = yol(A['yollar'].get('refuj_guney_nesneler', ''))
     if pg and os.path.exists(pg):
         ng = json_oku(pg); nesneler = dict(lambalar=nesneler['lambalar'] + ng['lambalar'], agaclar=nesneler['agaclar'] + ng['agaclar'])
+    pk = yol(A['yollar'].get('yol_kenari_nesneler', ''))
+    if kama is not None and pk and os.path.exists(pk):
+        # the wedge has no median detection: its trees are the measured roadside ones (kenar-tespit), which the roadside
+        # step leaves out inside the islands; they keep their measured crown
+        var = np.array([t['xy'] for t in nesneler['agaclar']]).reshape(-1, 2)
+        ek = [t for t in json_oku(pk)['agaclar'] if kama.contains(Point(*t['xy']))
+              and (len(var) == 0 or np.hypot(*(var - t['xy']).T).min() > 1.5)]
+        nesneler = dict(lambalar=nesneler['lambalar'], agaclar=nesneler['agaclar'] + ek)
+        print('  güney kaması: %d ölçülmüş yol kenarı ağacı refüje alındı' % len(ek))
     lambalar = []
     for l in nesneler['lambalar']:
         x, y = l['xy']; i = ta.query([x, y])[1]
@@ -335,7 +399,7 @@ def geometri(A, H, plan, nesneler=None):
         if any(np.hypot(x - l['x'], y - l['y']) < 1.5 for l in lambalar):
             continue
         h = float(t['boy']); agaclar.append(dict(tur='agac' if h >= 4.5 else 'cali', x=x, y=y, z=zcim(x, y), boy=h,
-                                                 tac=round(0.32 * h if h >= 4.5 else 0.45 * h, 2)))
+                                                 tac=round(t['tac'] if 'tac' in t else 0.32 * h if h >= 4.5 else 0.45 * h, 2)))
     # meshes of all pieces together
     for _, g_ in adalar[1:]:
         for vk, tk in (('KV', 'KT'), ('CV', 'CT'), ('BV', 'BT'), ('SV', 'ST')):

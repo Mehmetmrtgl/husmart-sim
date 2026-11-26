@@ -118,7 +118,16 @@ refuj:
   bati_seritler_ek: ["2000130", "2000138", "2000128", "2000253"]   # ... continued southwards to the junction
   eksen_baslangic_y: 300.0                # the median axis starts north of this y
   yaya_gecidi_boslugu_m: 0.5              # the median is cut where a crosswalk crosses it (crosswalk + this margin)
-  guney:                                  # lamp/tree detection for the south part of the median (refuj-guney-tespit); the island itself is the one above
+  # south of the nose the carriageways part: the median goes on as a widening wedge down to the campus junction ring
+  # (real curbs on both sides in the ZED frames; user 2026-11-26). Wedge = lane-free area in the box holding the seed point;
+  # its trees are the measured roadside ones (veri/yol_kenari_nesneler.json). Remove the block to end the median at y ~300 again.
+  guney_kama:
+    kutu: [-225.0, -140.0, 225.0, 310.0]  # x0 x1 y0 y1 (y1 must reach past the old nose, where the median is a straight strip)
+    tohum: [-178.0, 268.0]                # a point inside the wedge
+    # cut lines x1 y1 x2 y2 (the seed side stays): the lane-free gore between the K3 junction lanes 2000277 / 2000293 is
+    # road; the real island nose (keep-right sign) is where lane 2000149 starts
+    kes: [[-156.0, 247.1, -158.0, 245.3]]
+  guney:                                # lamp/tree detection for the south part of the median (refuj-guney-tespit); the island itself is the one above
     dogu_seritler: ["2000248", "2000284", "2000256", "2000188", "2000224", "2000092", "2000104"]   # northbound lanes, south -> north (inner border = left)
     bati_seritler: ["2000138", "2000128", "2000253"]                        # southbound lanes, north -> south (inner border = left)
     y_bas: 300.0                          # detection starts north of this y (junction at the south end)
