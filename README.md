@@ -50,13 +50,15 @@ Copying `~/autoware_data` from another machine in the lab also works.
 The Lanelet2 map is in the repo: `harita/beytepe_yeni_v2/lanelet2_map.osm`. The point cloud is too large for git and is on the
 **[Releases](https://github.com/Mehmetmrtgl/husmart-sim/releases)** page:
 
-    # download beytepe_yeni_v2_karolar.tar.gz from Releases, then:
+    # download beytepe_yeni_v2_karolar.tar.gz from Release v0.2 (matches this map and player beytepe-v0.2), then:
     tar -xzf beytepe_yeni_v2_karolar.tar.gz -C harita/
-    # (optional) single-file point cloud: pointcloud_map.pcd -> harita/beytepe_yeni_v2/
+    # (optional) single-file point cloud: pointcloud_map.pcd of v0.2 -> harita/beytepe_yeni_v2/
+
+The point cloud must come from the same scene as the AWSIM player, otherwise NDT localization drifts where the scene was edited.
 
 ### 2.5 AWSIM player
 
-**A) Prebuilt player (easy):** download `AWSIM-Beytepe-linux.tar.gz` from
+**A) Prebuilt player (easy):** download `AWSIM-Beytepe-linux.tar.gz` of release `beytepe-v0.2` from
 [husmart-awsim Releases](https://github.com/Mehmetmrtgl/husmart-awsim/releases):
 
     mkdir -p ~/awsim && tar -xzf AWSIM-Beytepe-linux.tar.gz -C ~/awsim/     # -> ~/awsim/Beytepe-Build/AWSIM-Beytepe.x86_64
@@ -138,7 +140,8 @@ so the three always match. Settings (paths, lane width, curb size, lamp spacing,
 
 To change the gate road: edit the drawing in Google Earth (keep the placemark names listed in `ayarlar.yaml`), save it over
 `veri/nizamiye_cizim.kml`, then run the commands above. Every overwritten file is first copied to `~/yedek/beytepe_duzenle/<time>/`.
-The base map and base cloud (`harita/beytepe_yeni_v2/temel/`) are the state before these edits; the base cloud is in the Releases.
+The base map and base cloud (`harita/beytepe_yeni_v2/temel/`) are the state before these edits; the base cloud is `pointcloud_map.pcd` of Release v0.1 (copy it to
+`harita/beytepe_yeni_v2/temel/` before running `bulut`).
 
 What the scene gets from these files:
 
